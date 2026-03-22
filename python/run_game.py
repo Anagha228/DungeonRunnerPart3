@@ -11,7 +11,7 @@ from treasure_runner.ui.game_ui import GameUI
 
 def create_profile(path: str) -> dict:
     if os.path.exists(path):
-        with open(path, "r") as f
+        with open(path, "r") as f:
             return json.load(f)
     name = input("No profile found. Enter your name: ").strip()
     while not name:

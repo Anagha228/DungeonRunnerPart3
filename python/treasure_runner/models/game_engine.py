@@ -18,7 +18,7 @@ class GameEngine:
     @property
     def player(self):
         return self._player
-    @property 
+    @property
     def last_message(self)->str:
         return self._last_message
 
@@ -38,7 +38,7 @@ class GameEngine:
         if status != Status.OK:
             raise status_to_status_exception(status, message="")
 
-    def get_room_string(self) -> str:
+    def render_current_room(self) -> str:
         s_str = ctypes.c_char_p()
         status = lib.game_engine_render_current_room(self._eng, ctypes.byref(s_str))
         if status != Status.OK:
@@ -72,4 +72,3 @@ class GameEngine:
         return r_list
     def get_current_room_id(self) -> int:
         return self._player.get_room()
-    

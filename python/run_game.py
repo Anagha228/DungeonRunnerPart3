@@ -25,7 +25,7 @@ def create_profile(path: str) -> dict:
     }
 def save_profile(path, profile) -> None:
     with open(path, "w") as f:
-    json.dump(profile, f, indent=2)
+        json.dump(profile, f, indent=2)
 def main():
     parser = argparse.ArgumentParser(description = "Treasure runner")
     parser.add_argument("--config", required = True, help = "Path to .ini config file")

@@ -5,7 +5,8 @@ from ..bindings import Direction
 class GameUI:
     def __init__(self, engine: GameEngine, profile: dict):
         # store engine, profile, and a message string for the message bar
-        pass
+        self._engine = engine
+        self._profile = profile
 
     def run(self, stdscr) -> None:
         # store stdscr as instance variable

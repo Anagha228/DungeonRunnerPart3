@@ -24,7 +24,7 @@ def create_profile(path: str) -> dict:
         "timestamp_last_played": ""
     }
 def save_profile(path, profile) -> None:
-    with open(path, "w") as f
+    with open(path, "w") as f:
     json.dump(profile, f, indent=2)
 def main():
     parser = argparse.ArgumentParser(description = "Treasure runner")

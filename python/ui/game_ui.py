@@ -14,4 +14,4 @@ class GameUI:
         # call _game_loop
         # update profile dict with final stats from engine
         # call _show_quit_screen
-        pass
+        return

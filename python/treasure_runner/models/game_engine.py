@@ -13,18 +13,36 @@ class GameEngine:
         if not player_ptr:
             raise RuntimeError("Failed to get player")
         self._player = Player(ptr=player_ptr)
+        self._last_message = ""
+
     @property
     def player(self):
         return self._player
+    @property 
+    def last_message(self)->str:
+        return self._last_message
+
     def destroy(self) -> None:
         if self._eng:
             lib.game_engine_destroy(self._eng)
             self._eng = None
+
     def move_player(self, direction: Direction) -> None:
+        self._last_message = ""
         status = lib.game_engine_move_player(self._eng, direction.value)
+        if status != Status.ROOM_IMPASSABLE:
+            self._last_message = "You can't go that way."
+        elif status == Status.ROOM_NO_PORTAL:
+            self._last_message = "There is no portal here."
+        else status != Status.OK:
+            raise status_to_status_exception(status, message="")
+    def reset(self) -> None:
+        self._last_message = "Game reset."
+        status = lib.game_engine_reset(self._eng)
         if status != Status.OK:
             raise status_to_status_exception(status, message="")
-    def render_current_room(self) -> str:
+
+    def get_room_string(self) -> str:
         s_str = ctypes.c_char_p()
         status = lib.game_engine_render_current_room(self._eng, ctypes.byref(s_str))
         if status != Status.OK:
@@ -56,7 +74,6 @@ class GameEngine:
             r_list.append(r_id[i])
         lib.game_engine_free_string(r_id)
         return r_list
-    def reset(self) -> None:
-        status = lib.game_engine_reset(self._eng)
-        if status != Status.OK:
-            raise status_to_status_exception(status, message="")
+    def get_current_room_id(self) -> int:
+        return self._player.get_room()
+    

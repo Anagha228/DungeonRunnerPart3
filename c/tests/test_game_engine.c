@@ -1,0 +1,333 @@
+#include <check.h>
+#include <stdlib.h>
+#include <string.h>
+#include "room.h"
+#include "types.h"
+#include "game_engine.h"
+#include "player.h"
+#include "graph.h"
+#include "world_loader.h"
+GameEngine *eng = NULL;
+Room *room = NULL;
+
+static void setup(void);
+static void teardown(void);
+//setup and teardown functions
+
+static void setup(void) {
+
+    Status s = game_engine_create("../assets/starter.ini", &eng);
+    ck_assert_ptr_nonnull(eng);
+    ck_assert_int_eq(s, OK);
+    
+}
+
+static void teardown(void)
+{
+    if (eng != NULL) {
+        game_engine_destroy(eng);
+        eng = NULL;
+    }
+}
+
+/* ============================================================
+ * Game Engine Creation Tests
+ * ============================================================ */
+START_TEST(test_game_engine_create_basic)
+{
+    GameEngine *engTest;
+    ck_assert_int_eq(game_engine_create("../assets/starter.ini", &engTest), OK);
+    ck_assert_ptr_nonnull(engTest->player);
+    ck_assert_ptr_nonnull(engTest->graph);
+}
+END_TEST
+
+/* ============================================================
+ * Game Engine Creation Tests null
+ * ============================================================ */
+START_TEST(test_game_engine_create_null_args)
+{
+    ck_assert_int_eq( game_engine_create(NULL, NULL), INVALID_ARGUMENT);
+    ck_assert_int_eq( game_engine_create(NULL, &eng), INVALID_ARGUMENT);
+    ck_assert_int_eq( game_engine_create("../assets/starter.ini", NULL), INVALID_ARGUMENT );
+}
+END_TEST
+
+/* ============================================================
+ * Get Player Tests
+ * ============================================================ */
+
+START_TEST(test_game_engine_get_player)
+{
+    ck_assert_ptr_nonnull(game_engine_get_player(eng));
+}
+END_TEST
+
+/* ============================================================
+ * Get Player Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_get_player_null)
+{
+    ck_assert_ptr_null(game_engine_get_player(NULL));
+}
+END_TEST
+
+/* ============================================================
+ * Move Player Tests Valid Move
+ * ============================================================ */
+
+START_TEST(test_game_engine_move_player_success)
+{
+    const Player *p = game_engine_get_player(eng);
+    int x0 = p->x;
+    int y0 = p->y;
+
+    Status s = game_engine_move_player(eng, DIR_EAST);
+
+    if (s == OK) {
+        p = game_engine_get_player(eng);
+        ck_assert_int_eq(p->x, x0 + 1);
+        ck_assert_int_eq(p->y, y0);
+    } else {
+        ck_assert_int_eq(s, ROOM_IMPASSABLE);
+    }
+}
+END_TEST
+
+/* ============================================================
+ * Move Player Tests Wall Block
+ * ============================================================ */
+START_TEST(test_game_engine_move_player_into_wall)
+{
+    Status s = game_engine_move_player(eng, DIR_NORTH);
+    ck_assert(s == OK || s == ROOM_IMPASSABLE);
+}
+END_TEST
+
+/* ============================================================
+ * Move Player Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_move_player_null)
+{
+    ck_assert_int_eq(game_engine_move_player(NULL, DIR_NORTH), INVALID_ARGUMENT);
+}
+END_TEST
+
+/* ============================================================
+ * Room Count
+ * ============================================================ */
+START_TEST(test_game_engine_room_count)
+{
+    int count = -1;
+    ck_assert_int_eq(game_engine_get_room_count(eng, &count), OK);
+
+    /* Config says num_rooms=3 */
+    ck_assert_int_eq(count, 3);
+}
+END_TEST
+
+/* ============================================================
+ * Get Room Count Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_get_room_count_null)
+{
+    int count = -1;
+    ck_assert_int_eq(game_engine_get_room_count(NULL, &count), INVALID_ARGUMENT);
+    ck_assert_int_eq(game_engine_get_room_count(eng, NULL), NULL_POINTER);
+}
+END_TEST
+
+/* ============================================================
+ * Room Dimensions 
+ * ============================================================ */
+START_TEST(test_game_engine_room_dimensions)
+{
+    int w = 0, h = 0;
+
+    ck_assert_int_eq(game_engine_get_room_dimensions(eng, &w, &h), OK);
+
+    /* Base 20x15 with variance +/-2 */
+    ck_assert_int_ge(w, 18);
+    ck_assert_int_le(w, 22);
+    ck_assert_int_ge(h, 13);
+    ck_assert_int_le(h, 17);
+}
+END_TEST
+
+/* ============================================================
+ * Get Room Dimensions Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_get_room_dimensions_null)
+{
+    int w = -1, h = -1;
+
+    ck_assert_int_eq(game_engine_get_room_dimensions(NULL, &w, &h), INVALID_ARGUMENT);
+    ck_assert_int_eq(game_engine_get_room_dimensions(eng, NULL, &h), NULL_POINTER);
+    ck_assert_int_eq(game_engine_get_room_dimensions(eng, &w, NULL),NULL_POINTER);
+}
+END_TEST
+
+/* ============================================================
+ * Reset Engine
+ * ============================================================ */
+START_TEST(test_game_engine_reset)
+{
+    game_engine_move_player(eng, DIR_EAST);
+    game_engine_move_player(eng, DIR_SOUTH);
+
+    ck_assert_int_eq(game_engine_reset(eng), OK);
+
+    const Player *p = game_engine_get_player(eng);
+    ck_assert_int_eq(p->room_id, eng->initial_room_id);
+    ck_assert_int_eq(p->x, eng->initial_player_x);
+    ck_assert_int_eq(p->y, eng->initial_player_y);
+}
+END_TEST
+
+/* ============================================================
+ * Reset Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_reset_null)
+{
+    ck_assert_int_eq(game_engine_reset(NULL), INVALID_ARGUMENT);
+}
+END_TEST
+
+/* ============================================================
+ * Render Current Room
+ * ============================================================ */
+START_TEST(test_game_engine_render_current_room)
+{
+    char *out = NULL;
+    ck_assert_int_eq( game_engine_render_current_room(eng, &out), OK);
+    ck_assert_ptr_nonnull(out);
+    ck_assert(strchr(out, '@') != NULL);
+    game_engine_free_string(out);
+
+}
+END_TEST
+
+/* ============================================================
+ * Render Current Room Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_render_current_room_null)
+{
+    char *out = NULL;
+    ck_assert_int_eq(game_engine_render_current_room(NULL, &out), INVALID_ARGUMENT);
+    ck_assert_int_eq(game_engine_render_current_room(eng, NULL), INVALID_ARGUMENT);
+}
+END_TEST
+
+/* ============================================================
+ * Render Room by ID
+ * ============================================================ */
+START_TEST(test_game_engine_render_room)
+{
+    int *ids = NULL;
+    int count = 0;
+    ck_assert_int_eq(game_engine_get_room_ids(eng, &ids, &count), OK);
+    char *out = NULL;
+    ck_assert_int_eq(game_engine_render_room(eng, ids[0], &out), OK);
+    ck_assert(strchr(out, '@') == NULL);
+}
+END_TEST
+
+/* ============================================================
+ * Render Room By ID Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_render_room_null)
+{
+    char *out = NULL;
+
+    ck_assert_int_eq(game_engine_render_room(NULL, 1, &out), INVALID_ARGUMENT);
+    ck_assert_int_eq(game_engine_render_room(eng, 1, NULL), NULL_POINTER);
+}
+END_TEST
+
+/* ============================================================
+ * Get Room IDs
+ * ============================================================ */
+START_TEST(test_game_engine_get_room_ids)
+{
+    int *ids = NULL;
+    int count = 0;
+    ck_assert_int_eq(game_engine_get_room_ids(eng, &ids, &count), OK);
+    ck_assert_int_eq(count, 3);
+    ck_assert_ptr_nonnull(ids);
+    for (int i = 0; i < count; i++) {
+        for (int j = i + 1; j < count; j++) {
+            ck_assert_int_ne(ids[i], ids[j]);
+        }
+        char *out = NULL;
+        ck_assert_int_eq(game_engine_render_room(eng, ids[i], &out), OK);
+        ck_assert_ptr_nonnull(out);
+    }
+}
+END_TEST
+
+/* ============================================================
+ * Get Room IDs Tests null
+ * ============================================================ */
+
+START_TEST(test_game_engine_get_room_ids_null)
+{
+    int *ids = NULL;
+    int count = 0;
+
+    ck_assert_int_eq( game_engine_get_room_ids(NULL, &ids, &count), INVALID_ARGUMENT);
+    ck_assert_int_eq( game_engine_get_room_ids(eng, NULL, &count), NULL_POINTER);
+    ck_assert_int_eq( game_engine_get_room_ids(eng, &ids, NULL), NULL_POINTER);
+}
+END_TEST
+
+/* ============================================================
+ * Destroy Tests
+ * ============================================================ */
+
+START_TEST(test_game_engine_destroy_null)
+{
+    /* Must not crash */
+    game_engine_destroy(NULL);
+}
+END_TEST
+
+
+/* ============================================================
+ * Suite Setup
+ * ============================================================ */
+Suite *game_engine_suite(void) {
+    Suite *s = suite_create("Game_engine");
+    TCase *tc_core = tcase_create("Core");
+    tcase_add_checked_fixture(tc_core, setup, teardown);
+
+    tcase_add_test(tc_core, test_game_engine_create_basic);
+    tcase_add_test(tc_core, test_game_engine_create_null_args);
+    tcase_add_test(tc_core, test_game_engine_move_player_success);
+    tcase_add_test(tc_core, test_game_engine_get_player);
+    tcase_add_test(tc_core, test_game_engine_destroy_null);
+    tcase_add_test(tc_core, test_game_engine_get_player_null);
+    tcase_add_test(tc_core, test_game_engine_move_player_null);
+    tcase_add_test(tc_core, test_game_engine_get_room_count_null);
+    tcase_add_test(tc_core, test_game_engine_get_room_dimensions_null);
+    tcase_add_test(tc_core, test_game_engine_reset_null);
+    tcase_add_test(tc_core, test_game_engine_render_current_room_null);
+    tcase_add_test(tc_core, test_game_engine_render_room_null);
+    tcase_add_test(tc_core, test_game_engine_get_room_ids_null);
+    tcase_add_test(tc_core, test_game_engine_get_room_ids);
+    tcase_add_test(tc_core, test_game_engine_render_room);
+    tcase_add_test(tc_core, test_game_engine_render_current_room);
+    tcase_add_test(tc_core, test_game_engine_reset);
+    tcase_add_test(tc_core, test_game_engine_room_dimensions);
+    tcase_add_test(tc_core, test_game_engine_room_count);
+    tcase_add_test(tc_core, test_game_engine_move_player_into_wall);
+    suite_add_tcase(s, tc_core);
+    return s;
+}
+

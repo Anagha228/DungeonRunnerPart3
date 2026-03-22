@@ -1,0 +1,62 @@
+import ctypes
+from .player import Player
+from ..bindings import Direction, lib, Status
+from .exceptions import *
+
+class GameEngine:
+    def __init__(self, config_path: str):
+        self._eng = ctypes.c_void_p()
+        status = lib.game_engine_create(config_path.encode(), ctypes.byref(self._eng))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+        player_ptr = lib.game_engine_get_player(self._eng)
+        if not player_ptr:
+            raise RuntimeError("Failed to get player")
+        self._player = Player(ptr=player_ptr)
+    @property
+    def player(self):
+        return self._player
+    def destroy(self) -> None:
+        if self._eng:
+            lib.game_engine_destroy(self._eng)
+            self._eng = None
+    def move_player(self, direction: Direction) -> None:
+        status = lib.game_engine_move_player(self._eng, direction.value)
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+    def render_current_room(self) -> str:
+        s_str = ctypes.c_char_p()
+        status = lib.game_engine_render_current_room(self._eng, ctypes.byref(s_str))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+        result = s_str.value.decode("utf-8")
+        lib.game_engine_free_string(s_str)
+        return result
+    def get_room_count(self) -> int:
+        x = ctypes.c_int()
+        status = lib.game_engine_get_room_count(self._eng, ctypes.byref(x))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+        return x.value
+    def get_room_dimensions(self) -> tuple[int, int]:
+        x = ctypes.c_int()
+        y = ctypes.c_int()
+        status = lib.game_engine_get_room_dimensions(self._eng, ctypes.byref(x), ctypes.byref(y))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+        return (x.value, y.value)
+    def get_room_ids(self) -> list[int]:
+        r_id = ctypes.POINTER(ctypes.c_int)()
+        count = ctypes.c_int()
+        status = lib.game_engine_get_room_ids(self._eng, ctypes.byref(r_id), ctypes.byref(count))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+        r_list = []
+        for i in range(count.value):
+            r_list.append(r_id[i])
+        lib.game_engine_free_string(r_id)
+        return r_list
+    def reset(self) -> None:
+        status = lib.game_engine_reset(self._eng)
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")

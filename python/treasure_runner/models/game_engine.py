@@ -30,11 +30,7 @@ class GameEngine:
     def move_player(self, direction: Direction) -> None:
         self._last_message = ""
         status = lib.game_engine_move_player(self._eng, direction.value)
-        if status != Status.ROOM_IMPASSABLE:
-            self._last_message = "You can't go that way."
-        elif status == Status.ROOM_NO_PORTAL:
-            self._last_message = "There is no portal here."
-        else status != Status.OK:
+        if status != Status.OK:
             raise status_to_status_exception(status, message="")
     def reset(self) -> None:
         self._last_message = "Game reset."

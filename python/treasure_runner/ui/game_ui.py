@@ -25,11 +25,10 @@ class GameUI:
         self._profile["max_treasure_collected"]= max(collected, self._profile["max_treasure_collected"])
         # call _show_quit_screen
         self._show_quit_screen()
-        return
 
     def _show_splash(self) -> None:
         self._screen.clear()
-        (screen_height, screen_width)=self._screen.getmaxyx()
+        (_, screen_width) = self._screen.getmaxyx()
         row = 0
         col = (screen_width - len("TREASURE RUNNER")) // 2
         self._screen.addstr(row, col, "TREASURE RUNNER")
@@ -61,9 +60,7 @@ class GameUI:
 
     def _draw(self) -> None:
         screen_height, screen_width = self._screen.getmaxyx()
-        min_height = 24
-        min_width = 80
-        if screen_height < min_height or screen_width < min_width:
+        if screen_height < 24 or screen_width < 80:
             self._screen.clear()
             self._screen.addstr(0, 0, f"Terminal too small! Need {min_width}x{min_height}")
             self._screen.refresh()
@@ -75,14 +72,14 @@ class GameUI:
         self._screen.addstr(row, 0, f"Room Number = {self._engine.get_current_room_id()}  Room Name = {self._engine.get_current_room_name()}")
         room_setup = self._engine.render_current_room()
         lines = room_setup.split("\n")
-        start_row = row + 1
+        row = row + 1
         for i, line in enumerate(lines):
-            self._screen.addstr(start_row+i, 4, line) 
-        (width, height) = self._engine.get_room_dimensions()
+            self._screen.addstr(row + i, 4, line)
+        width, _ = self._engine.get_room_dimensions()
         legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "x - exit",]
         for i, line in enumerate(legend):
-            self._screen.addstr(start_row + i, 4 + width + 4, line)
-        row = start_row + len(lines) + 1
+            self._screen.addstr(row + i, 4 + width + 4, line)
+        row = row + len(lines) + 1
         self._screen.addstr(row, 0, "Game Controls")
         row = row + 1
         self._screen.addstr(row, 0, "Controls: Arrows/WASD - move  > - portal  r - reset  q - quit")
@@ -93,7 +90,6 @@ class GameUI:
         self._screen.addstr(row, 0, "TREASURE RUN")
         self._screen.addstr(row, screen_width- len("anagha.19.kulkarni@gmail.com"), "anagha.19.kulkarni@gmail.com")
         self._screen.refresh()
-        return
 
     def _handle_input(self, key) -> bool:
         if key in (curses.KEY_UP, ord('w')):
@@ -125,7 +121,7 @@ class GameUI:
 
     def _show_quit_screen(self) -> None:
         self._screen.clear()
-        (screen_height, screen_width)=self._screen.getmaxyx()
+        (_, screen_width) = self._screen.getmaxyx()
         row = 0
         col = (screen_width - len("GAME OVER!!!")) // 2
         self._screen.addstr(row, col, "GAME OVER!!!")
@@ -144,4 +140,3 @@ class GameUI:
         self._screen.addstr(row, col, "Press any key to exit...")
         self._screen.refresh()
         self._screen.getch()
-        return

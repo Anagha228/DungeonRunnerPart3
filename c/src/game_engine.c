@@ -227,7 +227,8 @@ Status game_engine_move_player(GameEngine *eng, Direction dir){
         if (s != OK) {
             return INTERNAL_ERROR;
         }
-        int entry_x = 1, entry_y = 1;
+        int entry_x = 1;
+        int entry_y = 1;
         for (int row = 1; row < target_room->height - 1; row++) {
             for (int col = 1; col < target_room->width - 1; col++) {
                 if (room_is_walkable(target_room, col, row) &&

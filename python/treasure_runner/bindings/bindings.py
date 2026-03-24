@@ -149,6 +149,9 @@ lib.game_engine_get_room_ids.restype = Status
 lib.game_engine_get_current_room_name.argtypes = [GameEngine, ctypes.POINTER(ctypes.c_char_p)]
 lib.game_engine_get_current_room_name.restype = Status
 
+lib.game_engine_get_total_treasure_count.argtypes = [GameEngine, ctypes.POINTER(ctypes.c_int)]
+lib.game_engine_get_total_treasure_count.restype = Status
+
 # ============================================================
 # C Function Signatures - Player
 # ============================================================

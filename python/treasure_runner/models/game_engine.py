@@ -80,3 +80,9 @@ class GameEngine:
         if status != Status.OK or name.value is None:
             return "Unknown"
         return name.value.decode("utf-8")
+    def get_total_treasures(self) -> int:
+        count = ctypes.c_int()
+        status = lib.game_engine_get_total_treasure_count(self._eng, ctypes.byref(count))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+        return count.value

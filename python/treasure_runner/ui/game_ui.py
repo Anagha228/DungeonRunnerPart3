@@ -11,6 +11,7 @@ class GameUI:
         self._screen = None
         self._message = ""
         self._visited_rooms = set()
+        self._victory = False
 
     def run(self, stdscr) -> None:
         # store stdscr as instance variable
@@ -62,6 +63,9 @@ class GameUI:
             key = self._screen.getch()
             if not self._handle_input(key):
                 break
+            if self._check_victory():
+                self._show_victory_screen()
+            break
 
     def _draw(self) -> None:
         screen_height, screen_width = self._screen.getmaxyx()
@@ -141,6 +145,23 @@ class GameUI:
         row = row + 1
         self._screen.addstr(row, 0, f"Last Played: {self._profile['timestamp_last_played']}")
         row = row + 1
+        col = screen_width - len("Press any key to exit...")
+        self._screen.addstr(row, col, "Press any key to exit...")
+        self._screen.refresh()
+        self._screen.getch()
+
+    def _show_victory_screen(self) -> None:
+        self._screen.clear()
+        screen_height, screen_width = self._screen.getmaxyx()
+        row = screen_height // 2 - 3
+        col = screen_width - len("YOU WIN!") // 2
+        self._screen.addstr(row, col, "YOU WIN!")
+        row += 2
+        collected = self._engine.player.get_collected_count()
+        self._screen.addstr(row, 0, f"Treasures collected: {collected}")
+        row += 1
+        self._screen.addstr(row, 0, f"Rooms visited: {len(self._visited_rooms)}")
+        row += 2
         col = screen_width - len("Press any key to exit...")
         self._screen.addstr(row, col, "Press any key to exit...")
         self._screen.refresh()

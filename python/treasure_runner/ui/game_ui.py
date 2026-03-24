@@ -28,7 +28,7 @@ class GameUI:
 
     def _show_splash(self) -> None:
         self._screen.clear()
-        (_, screen_width) = self._screen.getmaxyx()
+        _, screen_width = self._screen.getmaxyx()
         row = 0
         col = (screen_width - len("TREASURE RUNNER")) // 2
         self._screen.addstr(row, col, "TREASURE RUNNER")
@@ -62,7 +62,7 @@ class GameUI:
         screen_height, screen_width = self._screen.getmaxyx()
         if screen_height < 24 or screen_width < 80:
             self._screen.clear()
-            self._screen.addstr(0, 0, f"Terminal too small! Need {min_width}x{min_height}")
+            self._screen.addstr(0, 0, f"Terminal too small! Need 80 x 24")
             self._screen.refresh()
             return
         self._screen.clear()
@@ -71,9 +71,9 @@ class GameUI:
         row = row+1
         self._screen.addstr(row, 0, f"Room Number = {self._engine.get_current_room_id()}  Room Name = {self._engine.get_current_room_name()}")
         room_setup = self._engine.render_current_room()
-        lines = room_setup.split("\n")
+        room_setup = room_setup.split("\n")
         row = row + 1
-        for i, line in enumerate(lines):
+        for i, line in enumerate(room_setup):
             self._screen.addstr(row + i, 4, line)
         width, _ = self._engine.get_room_dimensions()
         legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "x - exit",]
@@ -121,7 +121,7 @@ class GameUI:
 
     def _show_quit_screen(self) -> None:
         self._screen.clear()
-        (_, screen_width) = self._screen.getmaxyx()
+        _, screen_width = self._screen.getmaxyx()
         row = 0
         col = (screen_width - len("GAME OVER!!!")) // 2
         self._screen.addstr(row, col, "GAME OVER!!!")

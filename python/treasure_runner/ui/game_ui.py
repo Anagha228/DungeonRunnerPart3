@@ -1,6 +1,7 @@
 import curses
 from ..models.game_engine import GameEngine
 from ..bindings import Direction
+from datetime import datetime, timezone
 
 class GameUI:
     def __init__(self, engine: GameEngine, profile: dict):
@@ -9,6 +10,7 @@ class GameUI:
         self._profile = profile
         self._screen = None
         self._message = ""
+        self._visited_rooms = set()
 
     def run(self, stdscr) -> None:
         # store stdscr as instance variable
@@ -23,6 +25,8 @@ class GameUI:
         collected = self._engine.player.get_collected_count()
         self._profile["games_played"]+= 1
         self._profile["max_treasure_collected"]= max(collected, self._profile["max_treasure_collected"])
+        self._profile["timestamp_last_played"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self._profile["most_rooms_world_completed"] = max(len(self._visited_rooms), self._profile["most_rooms_world_completed"])
         # call _show_quit_screen
         self._show_quit_screen()
 
@@ -52,6 +56,7 @@ class GameUI:
         while True:
             try:
                 self._draw()
+                self._visited_rooms.add(self._engine.get_current_room_id())
             except curses.error:
                 pass  # terminal too small, just skip drawing this frame
             key = self._screen.getch()

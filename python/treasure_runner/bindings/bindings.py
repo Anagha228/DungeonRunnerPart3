@@ -114,7 +114,7 @@ GameEngine = ctypes.c_void_p
 Player = ctypes.c_void_p
 
 # ============================================================
-# C Function Signatures
+# C Function Signatures - Game Engine
 # ============================================================
 lib.game_engine_create.argtypes = [ctypes.c_char_p, ctypes.POINTER(GameEngine)]
 lib.game_engine_create.restype = Status
@@ -145,6 +145,9 @@ lib.game_engine_render_room.restype = Status
 
 lib.game_engine_get_room_ids.argtypes = [GameEngine, ctypes.POINTER(ctypes.POINTER(ctypes.c_int)), ctypes.POINTER(ctypes.c_int)]
 lib.game_engine_get_room_ids.restype = Status
+
+lib.game_engine_get_current_room_name.argtypes = [GameEngine, ctypes.POINTER(ctypes.c_char_p)]
+lib.game_engine_get_current_room_name.restype = Status
 
 # ============================================================
 # C Function Signatures - Player

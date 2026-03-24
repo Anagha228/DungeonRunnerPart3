@@ -13,6 +13,7 @@ typedef struct Player Player;
 
 static bool try_collect_at(Room *room, Player *p, int x, int y);
 static Room *find_portal_target(GameEngine *eng, Room *room, int x, int y);
+Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out);
 /* ============================================================
  * GameEngine - Main Game Controller
  *
@@ -226,7 +227,19 @@ Status game_engine_move_player(GameEngine *eng, Direction dir){
         if (s != OK) {
             return INTERNAL_ERROR;
         }
-        player_set_position(p, 0, 0);
+        int entry_x = 1, entry_y = 1;
+        for (int row = 1; row < target_room->height - 1; row++) {
+            for (int col = 1; col < target_room->width - 1; col++) {
+                if (room_is_walkable(target_room, col, row) &&
+                    room_get_portal_destination(target_room, col, row) == -1) {
+                    entry_x = col;
+                    entry_y = row;
+                    goto found;
+                }
+            }
+        }
+        found:
+        player_set_position(p, entry_x, entry_y);
         return OK;
     }
 
@@ -577,3 +590,16 @@ void game_engine_free_string(void *ptr){
     free(ptr);
 }
 
+// **********************************************************                                
+// ********************** ADDED FOR A3 **********************
+// **********************************************************
+
+Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out) {
+    if (eng == NULL || name_out == NULL) return INVALID_ARGUMENT;
+    Room key = {0};
+    key.id = eng->player->room_id;
+    Room *room = (Room *)graph_get_payload(eng->graph, &key);
+    if (room == NULL) return GE_NO_SUCH_ROOM;
+    *name_out = room->name;
+    return OK;
+}

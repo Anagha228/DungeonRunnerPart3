@@ -32,7 +32,7 @@ def main():
     parser.add_argument("--profile", required = True, help = "Path to player profile JSON" )
     args = parser.parse_args()
 
-    profile = load_or_create_profile(args.profile)
+    profile = create_profile(args.profile)
     engine = GameEngine(args.config)
     ui = GameUI(engine, profile)
 

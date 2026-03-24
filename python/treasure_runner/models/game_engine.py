@@ -30,7 +30,9 @@ class GameEngine:
     def move_player(self, direction: Direction) -> None:
         self._last_message = ""
         status = lib.game_engine_move_player(self._eng, direction.value)
-        if status != Status.OK:
+        if status == Status.ROOM_IMPASSABLE:
+            self._last_message = "You can't go that way."
+        elif status != Status.OK:
             raise status_to_status_exception(status, message="")
     def reset(self) -> None:
         self._last_message = "Game reset."
@@ -72,3 +74,10 @@ class GameEngine:
         return r_list
     def get_current_room_id(self) -> int:
         return self._player.get_room()
+    def get_current_room_name(self) -> str:
+        name = ctypes.c_char_p()
+        status = lib.game_engine_get_current_room_name(self._eng, ctypes.byref(name))
+        if status != Status.OK or name.value is None:
+            return "Unknown"
+        return name.value.decode("utf-8")
+

@@ -298,6 +298,133 @@ START_TEST(test_game_engine_destroy_null)
 }
 END_TEST
 
+/* ============================================================
+ * Additional Edge Case & Robustness Tests
+ * ============================================================ */
+
+START_TEST(test_game_engine_move_all_directions)
+{
+    Status s1 = game_engine_move_player(eng, DIR_NORTH);
+    Status s2 = game_engine_move_player(eng, DIR_SOUTH);
+    Status s3 = game_engine_move_player(eng, DIR_EAST);
+    Status s4 = game_engine_move_player(eng, DIR_WEST);
+
+    ck_assert(s1 == OK || s1 == ROOM_IMPASSABLE);
+    ck_assert(s2 == OK || s2 == ROOM_IMPASSABLE);
+    ck_assert(s3 == OK || s3 == ROOM_IMPASSABLE);
+    ck_assert(s4 == OK || s4 == ROOM_IMPASSABLE);
+}
+END_TEST
+
+
+START_TEST(test_game_engine_move_invalid_direction)
+{
+    Status s = game_engine_move_player(eng, (Direction)999);
+    ck_assert_int_eq(s, INVALID_ARGUMENT);
+}
+END_TEST
+
+
+START_TEST(test_render_contains_newlines)
+{
+    char *out = NULL;
+    ck_assert_int_eq(game_engine_render_current_room(eng, &out), OK);
+
+    ck_assert_ptr_nonnull(out);
+    ck_assert(strchr(out, '\n') != NULL);
+
+    game_engine_free_string(out);
+}
+END_TEST
+
+
+START_TEST(test_player_position_changes_on_valid_move)
+{
+    const Player *p = game_engine_get_player(eng);
+    int x0 = p->x;
+    int y0 = p->y;
+
+    Status s = game_engine_move_player(eng, DIR_EAST);
+
+    if (s == OK) {
+        p = game_engine_get_player(eng);
+        ck_assert(p->x != x0 || p->y != y0);
+    }
+}
+END_TEST
+
+
+START_TEST(test_reset_clears_treasures)
+{
+    game_engine_move_player(eng, DIR_EAST);
+    game_engine_move_player(eng, DIR_SOUTH);
+
+    game_engine_reset(eng);
+
+    const Player *p = game_engine_get_player(eng);
+    ck_assert_int_eq(p->collected_count, 0);
+}
+END_TEST
+
+
+START_TEST(test_render_room_invalid_id)
+{
+    char *out = NULL;
+    ck_assert_int_eq(game_engine_render_room(eng, 9999, &out), GE_NO_SUCH_ROOM);
+}
+END_TEST
+
+
+START_TEST(test_room_ids_valid)
+{
+    int *ids = NULL;
+    int count = 0;
+
+    ck_assert_int_eq(game_engine_get_room_ids(eng, &ids, &count), OK);
+    ck_assert(count > 0);
+
+    for (int i = 0; i < count; i++) {
+        ck_assert_int_ge(ids[i], 0);
+    }
+
+    free(ids);
+}
+END_TEST
+
+
+START_TEST(test_game_engine_create_invalid_file)
+{
+    GameEngine *bad = NULL;
+    Status s = game_engine_create("invalid_path.ini", &bad);
+
+    ck_assert(s != OK);
+}
+END_TEST
+
+
+START_TEST(test_room_dimensions_stable)
+{
+    int w1, h1, w2, h2;
+
+    ck_assert_int_eq(game_engine_get_room_dimensions(eng, &w1, &h1), OK);
+
+    game_engine_move_player(eng, DIR_EAST);
+
+    ck_assert_int_eq(game_engine_get_room_dimensions(eng, &w2, &h2), OK);
+
+    ck_assert_int_eq(w1, w2);
+    ck_assert_int_eq(h1, h2);
+}
+END_TEST
+
+
+START_TEST(test_multiple_resets)
+{
+    ck_assert_int_eq(game_engine_reset(eng), OK);
+    ck_assert_int_eq(game_engine_reset(eng), OK);
+    ck_assert_int_eq(game_engine_reset(eng), OK);
+}
+END_TEST
 
 /* ============================================================
  * Suite Setup
@@ -327,6 +454,18 @@ Suite *game_engine_suite(void) {
     tcase_add_test(tc_core, test_game_engine_room_dimensions);
     tcase_add_test(tc_core, test_game_engine_room_count);
     tcase_add_test(tc_core, test_game_engine_move_player_into_wall);
+
+    tcase_add_test(tc_core, test_game_engine_move_all_directions);
+    tcase_add_test(tc_core, test_game_engine_move_invalid_direction);
+    tcase_add_test(tc_core, test_render_contains_newlines);
+    tcase_add_test(tc_core, test_player_position_changes_on_valid_move);
+    tcase_add_test(tc_core, test_reset_clears_treasures);
+    tcase_add_test(tc_core, test_render_room_invalid_id);
+    tcase_add_test(tc_core, test_room_ids_valid);
+    tcase_add_test(tc_core, test_game_engine_create_invalid_file);
+    tcase_add_test(tc_core, test_room_dimensions_stable);
+    tcase_add_test(tc_core, test_multiple_resets);
+    
     suite_add_tcase(s, tc_core);
     return s;
 }

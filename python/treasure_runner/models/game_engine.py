@@ -80,4 +80,3 @@ class GameEngine:
         if status != Status.OK or name.value is None:
             return "Unknown"
         return name.value.decode("utf-8")
-

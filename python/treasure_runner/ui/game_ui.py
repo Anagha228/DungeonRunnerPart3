@@ -43,7 +43,7 @@ class GameUI:
         row = row + 1
         self._screen.addstr(row, 0, f"Last Played: {self._profile['timestamp_last_played']}")
         row = row + 1
-        col = (screen_width - len("Press any key to continue..."))
+        col = screen_width - len("Press any key to continue...")
         self._screen.addstr(row, col, "Press any key to continue...")
         self._screen.refresh()
         self._screen.getch()
@@ -62,7 +62,7 @@ class GameUI:
         screen_height, screen_width = self._screen.getmaxyx()
         if screen_height < 24 or screen_width < 80:
             self._screen.clear()
-            self._screen.addstr(0, 0, f"Terminal too small! Need 80 x 24")
+            self._screen.addstr(0, 0, "Terminal too small! Need 80 x 24")
             self._screen.refresh()
             return
         self._screen.clear()
@@ -79,7 +79,7 @@ class GameUI:
         legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "x - exit",]
         for i, line in enumerate(legend):
             self._screen.addstr(row + i, 4 + width + 4, line)
-        row = row + len(lines) + 1
+        row = row + len(room_setup) + 1
         self._screen.addstr(row, 0, "Game Controls")
         row = row + 1
         self._screen.addstr(row, 0, "Controls: Arrows/WASD - move  > - portal  r - reset  q - quit")
@@ -136,7 +136,7 @@ class GameUI:
         row = row + 1
         self._screen.addstr(row, 0, f"Last Played: {self._profile['timestamp_last_played']}")
         row = row + 1
-        col = (screen_width - len("Press any key to exit..."))
+        col = screen_width - len("Press any key to exit...")
         self._screen.addstr(row, col, "Press any key to exit...")
         self._screen.refresh()
         self._screen.getch()

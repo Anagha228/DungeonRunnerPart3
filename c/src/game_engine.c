@@ -606,11 +606,13 @@ Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out)
 }
 
 Status game_engine_get_total_treasure_count(const GameEngine *eng, int *count_out) {
-    if (eng == NULL || count_out == NULL) return INVALID_ARGUMENT;
+    if (eng == NULL || count_out == NULL){
+        return INVALID_ARGUMENT;
+    }
     const void * const *all_rooms = NULL;
     int total_rooms = 0;
-    graph_get_all_payloads(eng->graph, &all_rooms, &total_rooms);
     int total = 0;
+    graph_get_all_payloads(eng->graph, &all_rooms, &total_rooms);
     for (int i = 0; i < total_rooms; i++) {
         Room *r = (Room *)all_rooms[i];
         total += r->treasure_count;

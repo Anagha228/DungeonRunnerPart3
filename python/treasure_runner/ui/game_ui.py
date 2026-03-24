@@ -1,7 +1,7 @@
 import curses
+from datetime import datetime, timezone
 from ..models.game_engine import GameEngine
 from ..bindings import Direction
-from datetime import datetime, timezone
 
 class GameUI:
     def __init__(self, engine: GameEngine, profile: dict):

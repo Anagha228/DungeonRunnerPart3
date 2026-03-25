@@ -49,6 +49,8 @@ static Status copy_portals(Room *new_room, const DG_Room *room){
             new_room->portals[i].y  = room->portals[i].y;
             new_room->portals[i].target_room_id = room->portals[i].neighbor_id;
             new_room->portals[i].name = NULL;
+            new_room->portals[i].gated = (room->portals[i].required_switch_id >= 0);
+            new_room->portals[i].required_switch_id = room->portals[i].required_switch_id;
         }
         new_room->portal_count = room->portal_count;
     }
@@ -92,7 +94,25 @@ static Status copy_pushables(Room *new_room, const DG_Room *room){
         new_room->pushable_count = room->pushable_count;
     }
     return OK;
-}        
+}     
+
+static Status copy_switches(Room *new_room, const DG_Room *room){
+    if (room->switch_count > 0 && room->switches != NULL) {
+        new_room->switches = malloc(room->switch_count * sizeof(Switch));
+        if (!new_room->switches) {
+            return NO_MEMORY;
+        }
+        for (int i = 0; i < room->switch_count; i++) {
+            new_room->switches[i].id        = room->switches[i].id;
+            new_room->switches[i].x         = room->switches[i].x;
+            new_room->switches[i].y         = room->switches[i].y;
+            new_room->switches[i].portal_id = room->switches[i].portal_id;
+        }
+        new_room->switch_count = room->switch_count;
+    }
+    return OK;
+}
+
 static Status connect_rooms(Room **rooms, size_t room_count, Graph **graph){
     for (size_t i = 0; i < room_count; i++) {
         Room *room = rooms[i];
@@ -229,7 +249,7 @@ Status loader_load_world(const char *config_file, Graph **graph_out, Room **firs
         (*num_rooms_out)++;
 
         // Deep copy floor grid, portals, and treasures
-        if (copy_floor_grid(new_room, &room)!= OK || copy_portals(new_room, &room)!= OK || copy_treasures(new_room, &room)!= OK || copy_pushables(new_room, &room)!= OK){
+        if (copy_floor_grid(new_room, &room)!= OK || copy_portals(new_room, &room)!= OK || copy_treasures(new_room, &room)!= OK || copy_pushables(new_room, &room)!= OK || copy_switches(new_room, &room)){
             free(rooms);
             graph_destroy(graph);
             stop_datagen();
@@ -260,6 +280,8 @@ Status loader_load_world(const char *config_file, Graph **graph_out, Room **firs
     charset_out->treasure = dg_charset->treasure;
     charset_out->player   = dg_charset->player;
     charset_out->pushable = dg_charset->pushable;
+    charset_out->switch_off = dg_charset->switch_off;
+    charset_out->switch_on  = dg_charset->switch_on;
     
     free(rooms);
     stop_datagen();

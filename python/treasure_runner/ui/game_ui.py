@@ -11,7 +11,6 @@ class GameUI:
         self._screen = None
         self._message = ""
         self._visited_rooms = set()
-        self._victory = False
 
     def run(self, stdscr) -> None:
         # store stdscr as instance variable
@@ -26,7 +25,7 @@ class GameUI:
         collected = self._engine.player.get_collected_count()
         self._profile["games_played"]+= 1
         self._profile["max_treasure_collected"]= max(collected, self._profile["max_treasure_collected"])
-        self._profile["timestamp_last_played"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        self._profile["timestamp_last_played"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT  %H:%M:%SZ")
         self._profile["most_rooms_world_completed"] = max(len(self._visited_rooms), self._profile["most_rooms_world_completed"])
         # call _show_quit_screen
         self._show_quit_screen()
@@ -94,38 +93,55 @@ class GameUI:
         for i, line in enumerate(room_setup):
             self._screen.addstr(row + i, 4, line)
         width, _ = self._engine.get_room_dimensions()
-        legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "x - exit",]
+        legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "x - exit", "o - pushable", "^ - switch (off)", "* - switch (on)",]
         for i, line in enumerate(legend):
             self._screen.addstr(row + i, 4 + width + 4, line)
-        row = row + len(room_setup) + 1
+        row = row + len(room_setup)
         self._screen.addstr(row, 0, "Game Controls")
         row = row + 1
-        self._screen.addstr(row, 0, "Controls: Arrows/WASD - move  > - portal  r - reset  q - quit")
+        self._screen.addstr(row, 0, "Controls: | Arrows/WASD - move | > - portal | r - reset | q - quit")
         row = row + 2
         collected = self._engine.player.get_collected_count()
-        self._screen.addstr(row, 0, f"Player: {self._profile['player_name']}  Treasure: {collected}  Room: {self._engine.get_current_room_id()}")
-        row = row +1
+        self._screen.addstr(row, 0, f"Player: {self._profile['player_name']} | Gold Collected : {collected}/{self._engine.get_total_treasures()} | Room visiting: {self._engine.get_current_room_id()} | Rooms visited: {len(self._visited_rooms)}/{self._engine.get_room_count()}")
+        row = row + 2
         self._screen.addstr(row, 0, "TREASURE RUN")
         self._screen.addstr(row, screen_width- len("anagha.19.kulkarni@gmail.com"), "anagha.19.kulkarni@gmail.com")
+        self._message = ""
         self._screen.refresh()
 
     def _handle_input(self, key) -> bool:
         if key in (curses.KEY_UP, ord('w')):
             # move north
+            before = self._engine.player.get_collected_count()
             self._engine.move_player(Direction.NORTH)
-            self._message = self._engine.last_message
+            if before < self._engine.player.get_collected_count():
+                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
+            else:
+                self._message = self._engine.last_message
         elif key in (curses.KEY_DOWN, ord('s')):
             # move south
+            before = self._engine.player.get_collected_count()
             self._engine.move_player(Direction.SOUTH)
-            self._message = self._engine.last_message
+            if before < self._engine.player.get_collected_count():
+                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
+            else:
+                self._message = self._engine.last_message
         elif key in (curses.KEY_LEFT, ord('a')):
             # move west
+            before = self._engine.player.get_collected_count()
             self._engine.move_player(Direction.WEST)
-            self._message = self._engine.last_message
+            if before < self._engine.player.get_collected_count():
+                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
+            else:
+                self._message = self._engine.last_message
         elif key in (curses.KEY_RIGHT, ord('d')):
             # move east
+            before = self._engine.player.get_collected_count()
             self._engine.move_player(Direction.EAST)
-            self._message = self._engine.last_message
+            if before < self._engine.player.get_collected_count():
+                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
+            else:
+                self._message = self._engine.last_message
         elif key == ord('>'):
             # use portal
             self._message = "Walk into a portal to use it."
@@ -135,48 +151,56 @@ class GameUI:
             self._message = self._engine.last_message
         elif key == ord('q'):
             return False
+        elif key == ord('x'):
+            return False
         return True
 
     def _show_quit_screen(self) -> None:
-        self._screen.clear()
-        _, screen_width = self._screen.getmaxyx()
-        row = 0
-        col = (screen_width - len("GAME OVER!!!")) // 2
-        self._screen.addstr(row, col, "GAME OVER!!!")
-        row = row + 1
-        self._screen.addstr(row, 0, f"Player: {self._profile['player_name']}")
-        row = row + 1
-        self._screen.addstr(row, 0, f"Games Played: {self._profile['games_played']}")
-        row = row + 1
-        self._screen.addstr(row, 0, f"Max Treasure: {self._profile['max_treasure_collected']}")
-        row = row + 1
-        self._screen.addstr(row, 0, f"Rooms Completed: {self._profile['most_rooms_world_completed']}")
-        row = row + 1
-        self._screen.addstr(row, 0, f"Last Played: {self._profile['timestamp_last_played']}")
-        row = row + 1
-        col = max(0, screen_width - len("Press any key to exit..."))
-        self._screen.addstr(row, col, "Press any key to exit...")
+        try:
+            self._screen.clear()
+            screen_height, screen_width = self._screen.getmaxyx()
+            row = 0
+            col = (screen_width - len("GAME OVER!!!")) // 2
+            self._screen.addstr(row, col, "GAME OVER!!!")
+            row += 1
+            self._screen.addstr(row, 0, f"Player: {self._profile['player_name']}")
+            row += 1
+            self._screen.addstr(row, 0, f"Games Played: {self._profile['games_played']}")
+            row += 1
+            self._screen.addstr(row, 0, f"Max Treasure: {self._profile['max_treasure_collected']}")
+            row += 1
+            self._screen.addstr(row, 0, f"Rooms Completed: {self._profile['most_rooms_world_completed']}")
+            row += 1
+            self._screen.addstr(row, 0, f"Last Played: {self._profile['timestamp_last_played']}")
+            row += 1
+            col = max(0, screen_width - len("Press any key to exit..."))
+            self._screen.addstr(row, col, "Press any key to exit...")
+        except curses.error:
+            pass
         self._screen.refresh()
         self._screen.getch()
 
     def _check_victory(self) -> bool:
         collected = self._engine.player.get_collected_count()
         total = self._engine.get_total_treasures()
-        return collected >= total
+        return collected == total
 
     def _show_victory_screen(self) -> None:
-        self._screen.clear()
-        screen_height, screen_width = self._screen.getmaxyx()
-        row = screen_height // 2 - 3
-        col = (screen_width - len("YOU WIN!")) // 2
-        self._screen.addstr(row, col, "YOU WIN!")
-        row += 2
-        collected = self._engine.player.get_collected_count()
-        self._screen.addstr(row, 0, f"Treasures collected: {collected}")
-        row += 1
-        self._screen.addstr(row, 0, f"Rooms visited: {len(self._visited_rooms)}")
-        row += 2
-        col = max(0, screen_width - len("Press any key to continue..."))
-        self._screen.addstr(row, col, "Press any key to exit...")
+        try:
+            self._screen.clear()
+            screen_height, screen_width = self._screen.getmaxyx()
+            row = screen_height // 2 - 3
+            col = (screen_width - len("YOU WIN!")) // 2
+            self._screen.addstr(row, col, "YOU WIN!")
+            row += 2
+            collected = self._engine.player.get_collected_count()
+            self._screen.addstr(row, 0, f"Treasures collected: {collected}/{self._engine.get_total_treasures()}")
+            row += 1
+            self._screen.addstr(row, 0, f"Rooms visited: {len(self._visited_rooms)}")
+            row += 2
+            col = max(0, screen_width - len("Press any key to continue..."))
+            self._screen.addstr(row, col, "Press any key to exit...")
+        except curses.error:
+            pass
         self._screen.refresh()
         self._screen.getch()

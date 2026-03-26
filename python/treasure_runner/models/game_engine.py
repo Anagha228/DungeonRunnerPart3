@@ -92,20 +92,20 @@ class GameEngine:
         return count.value
 
     def get_charset(self):
-        cs = CCharset()
-        status = lib.game_engine_get_charset(self._eng, ctypes.byref(cs))
+        charset = CCharset()
+        status = lib.game_engine_get_charset(self._eng, ctypes.byref(charset))
         if status != Status.OK:
             raise status_to_status_exception(status, message="")
 
         return Charset(
-            cs.wall.decode(),
-            cs.floor.decode(),
-            cs.player.decode(),
-            cs.pushable.decode(),
-            cs.treasure.decode(),
-            cs.portal.decode(),
-            cs.switch_off.decode(),
-            cs.switch_on.decode(),
+            charset.wall.decode(),
+            charset.floor.decode(),
+            charset.player.decode(),
+            charset.pushable.decode(),
+            charset.treasure.decode(),
+            charset.portal.decode(),
+            charset.switch_off.decode(),
+            charset.switch_on.decode(),
         )
 class Charset:
     def __init__(self, wall, floor, player, pushable,

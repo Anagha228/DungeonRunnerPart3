@@ -99,17 +99,17 @@ class GameUI:
         self._screen.addstr(row, 0, f"Room Number = {self._engine.get_current_room_id()}  Room Name = {self._engine.get_current_room_name()}")
         self._room_setup(row)
         width, _ = self._engine.get_room_dimensions()
-        cs = self._engine.get_charset()
+        charset = self._engine.get_charset()
         legend = [
             "Game Elements:",
-            f"{cs.player} - player",
-            f"{cs.wall} - wall",
-            f"{cs.treasure} - gold",
-            f"{cs.portal} - portal",
+            f"{charset.player} - player",
+            f"{charset.wall} - wall",
+            f"{charset.treasure} - gold",
+            f"{charset.portal} - portal",
             "L - locked portal",
-            f"{cs.pushable} - pushable",
-            f"{cs.switch_off} - switch (off)",
-            f"{cs.switch_on} - switch (on)",
+            f"{charset.pushable} - pushable",
+            f"{charset.switch_off} - switch (off)",
+            f"{charset.switch_on} - switch (on)",
         ]
         for i, line in enumerate(legend):
             self._screen.addstr(row + i, 4 + width + 4, line)
@@ -130,22 +130,21 @@ class GameUI:
         room_lines = self._engine.render_current_room().split("\n")
         row = row+1
          # map characters to color pair numbers
-        cs = self._engine.get_charset()
+        charset = self._engine.get_charset()
         color_map = {
-            cs.player: (1, curses.A_BOLD),
-            cs.treasure: (2, 0),
-            cs.portal: (3, curses.A_BOLD),
+            charset.player: (1, curses.A_BOLD),
+            charset.treasure: (2, 0),
+            charset.portal: (3, curses.A_BOLD),
             'L': (4, 0),
-            cs.pushable: (5, 0),
-            cs.wall: (6, 0),
-            cs.switch_off: (7, 0),
-            cs.switch_on: (8, 0),
+            charset.pushable: (5, 0),
+            charset.wall: (6, 0),
+            charset.switch_off: (7, 0),
+            charset.switch_on: (8, 0),
         }
         for i, line in enumerate(room_lines):
             for j, char in enumerate(line):
-                entry = color_map.get(char)
-                if entry:
-                    pair, bold = entry
+                if color_map.get(char):
+                    pair, bold = color_map.get(char)
                     attr = curses.color_pair(pair) | bold
                 else:
                     attr = curses.A_NORMAL

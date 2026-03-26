@@ -337,12 +337,10 @@ static void render_portals(const Room *r, const Charset *charset, char *buffer) 
         if (px < 0 || py < 0 || px >= r->width || py >= r->height){ 
             continue;
         }
-        char ch;
-        if (!r->portals[i].gated) {
-            ch = charset->portal;
-        } else if (is_gated_portal_unlocked(r, r->portals[i].required_switch_id)) {
-            ch = charset->portal;
-        } else {
+        bool locked = r->portals[i].gated &&
+                      !is_gated_portal_unlocked(r, r->portals[i].required_switch_id);
+        char ch = charset->portal;
+        if (locked) {
             ch = 'L';
         }
         buffer[py * r->width + px] = ch;

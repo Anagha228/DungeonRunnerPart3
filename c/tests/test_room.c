@@ -820,6 +820,193 @@ START_TEST(test_room_try_push_blocked)
 END_TEST
 
 /* ============================================================
+ * room_classify_tile pushable
+ * ============================================================ */
+START_TEST(test_room_classify_tile_pushable)
+{
+    Pushable *push = malloc(sizeof(Pushable));
+    push->x = 1;
+    push->y = 1;
+    push->id = 0;
+    r->pushables = push;
+    r->pushable_count = 1;
+
+    int id = -1;
+    ck_assert_int_eq(room_classify_tile(r, 1, 1, &id), ROOM_TILE_PUSHABLE);
+    r->pushables = NULL;
+    r->pushable_count = 0;
+    free(push);
+}
+END_TEST
+
+START_TEST(test_room_classify_tile_invalid)
+{
+    ck_assert_int_eq(room_classify_tile(NULL, 0, 0, NULL), ROOM_TILE_INVALID);
+    ck_assert_int_eq(room_classify_tile(r, -1, 0, NULL), ROOM_TILE_INVALID);
+    ck_assert_int_eq(room_classify_tile(r, 0, -1, NULL), ROOM_TILE_INVALID);
+    ck_assert_int_eq(room_classify_tile(r, 99, 99, NULL), ROOM_TILE_INVALID);
+}
+END_TEST
+
+/* ============================================================
+ * room_get_start_position no walkable tile
+ * ============================================================ */
+START_TEST(test_room_get_start_position_no_walkable)
+{
+    /* 1x1 room has no interior tiles */
+    Room *tiny = room_create(99, "tiny", 1, 1);
+    ck_assert_ptr_nonnull(tiny);
+    int x, y;
+    ck_assert_int_eq(room_get_start_position(tiny, &x, &y), ROOM_NOT_FOUND);
+    room_destroy(tiny);
+}
+END_TEST
+
+/* ============================================================
+ * room_render null arguments
+ * ============================================================ */
+START_TEST(test_room_render_null_args)
+{
+    Charset cs = { .floor = '.', .wall = '#', .treasure = '$', .portal = 'X' };
+    char buffer[9];
+    ck_assert_int_eq(room_render(NULL, &cs, buffer, 3, 3), INVALID_ARGUMENT);
+    ck_assert_int_eq(room_render(r, NULL, buffer, 3, 3), INVALID_ARGUMENT);
+    ck_assert_int_eq(room_render(r, &cs, NULL, 3, 3), INVALID_ARGUMENT);
+}
+END_TEST
+
+START_TEST(test_room_render_wrong_dimensions)
+{
+    Charset cs = { .floor = '.', .wall = '#', .treasure = '$', .portal = 'X' };
+    char buffer[9];
+    ck_assert_int_eq(room_render(r, &cs, buffer, 5, 5), INVALID_ARGUMENT);
+    ck_assert_int_eq(room_render(r, &cs, buffer, 3, 5), INVALID_ARGUMENT);
+}
+END_TEST
+
+/* ============================================================
+ * room_is_walkable with portal
+ * ============================================================ */
+START_TEST(test_room_is_walkable_open_portal)
+{
+    Portal *p = malloc(sizeof(Portal));
+    p->x = 1;
+    p->y = 0;
+    p->target_room_id = 5;
+    p->gated = false;
+    p->name = strdup("P");
+    room_set_portals(r, p, 1);
+
+    ck_assert(room_is_walkable(r, 1, 0));
+}
+END_TEST
+
+START_TEST(test_room_is_walkable_pushable_blocks)
+{
+    Pushable *push = malloc(sizeof(Pushable));
+    push->x = 1;
+    push->y = 1;
+    push->id = 0;
+    r->pushables = push;
+    r->pushable_count = 1;
+    r->switch_count = 0;
+
+    ck_assert(!room_is_walkable(r, 1, 1));
+
+    r->pushables = NULL;
+    r->pushable_count = 0;
+    free(push);
+}
+END_TEST
+
+/* ============================================================
+ * room_place_treasure multiple
+ * ============================================================ */
+START_TEST(test_room_place_treasure_multiple)
+{
+    Treasure t1 = { .id = 1, .x = 1, .y = 1, .name = "A", .collected = false };
+    Treasure t2 = { .id = 2, .x = 2, .y = 2, .name = "B", .collected = false };
+
+    ck_assert_int_eq(room_place_treasure(r, &t1), OK);
+    ck_assert_int_eq(room_place_treasure(r, &t2), OK);
+    ck_assert_int_eq(r->treasure_count, 2);
+    ck_assert_int_eq(room_get_treasure_at(r, 1, 1), 1);
+    ck_assert_int_eq(room_get_treasure_at(r, 2, 2), 2);
+}
+END_TEST
+
+/* ============================================================
+ * room_get_treasure_at collected treasure
+ * ============================================================ */
+START_TEST(test_room_get_treasure_at_collected)
+{
+    Treasure *t = malloc(sizeof(Treasure));
+    t->id = 10;
+    t->x = 1;
+    t->y = 1;
+    t->collected = true;
+    t->name = strdup("Gold");
+    room_set_treasures(r, t, 1);
+
+    /* collected treasure should not be found */
+    ck_assert_int_eq(room_get_treasure_at(r, 1, 1), -1);
+}
+END_TEST
+
+/* ============================================================
+ * room_try_push all directions
+ * ============================================================ */
+START_TEST(test_room_try_push_all_directions)
+{
+    int size = r->width * r->height;
+    bool *grid = malloc(size * sizeof(bool));
+    for (int i = 0; i < size; i++) grid[i] = true;
+    room_set_floor_grid(r, grid);
+
+    Pushable *pushables = malloc(sizeof(Pushable));
+    pushables[0].id = 0;
+    pushables[0].x = 1;
+    pushables[0].y = 1;
+    r->pushable_count = 1;
+    r->pushables = pushables;
+
+    ck_assert_int_eq(room_try_push(r, 0, DIR_EAST), OK);
+    ck_assert_int_eq(r->pushables[0].x, 2);
+
+    r->pushables[0].x = 1;
+    r->pushables[0].y = 1;
+    ck_assert_int_eq(room_try_push(r, 0, DIR_SOUTH), OK);
+    ck_assert_int_eq(r->pushables[0].y, 2);
+
+    r->pushables[0].x = 1;
+    r->pushables[0].y = 1;
+    ck_assert_int_eq(room_try_push(r, 0, DIR_NORTH), OK);
+    ck_assert_int_eq(r->pushables[0].y, 0);
+
+    r->pushables = NULL;
+    r->pushable_count = 0;
+    free(pushables);
+}
+END_TEST
+
+START_TEST(test_room_try_push_invalid_direction)
+{
+    Pushable *push = malloc(sizeof(Pushable));
+    push->id = 0;
+    push->x = 1;
+    push->y = 1;
+    r->pushables = push;
+    r->pushable_count = 1;
+
+    ck_assert_int_eq(room_try_push(r, 0, (Direction)999), INVALID_ARGUMENT);
+
+    r->pushables = NULL;
+    r->pushable_count = 0;
+    free(push);
+}
+END_TEST
+
+/* ============================================================
  * Suite Setup
  * ============================================================ */
 Suite *room_suite(void) {
@@ -871,6 +1058,18 @@ Suite *room_suite(void) {
     tcase_add_test(tc_core, test_room_pick_up_success);
     tcase_add_test(tc_core, test_room_get_id_null);
     tcase_add_test(tc_core, test_room_get_id_valid);
+
+    tcase_add_test(tc_core, test_room_classify_tile_pushable);
+    tcase_add_test(tc_core, test_room_classify_tile_invalid);
+    tcase_add_test(tc_core, test_room_get_start_position_no_walkable);
+    tcase_add_test(tc_core, test_room_render_null_args);
+    tcase_add_test(tc_core, test_room_render_wrong_dimensions);
+    tcase_add_test(tc_core, test_room_is_walkable_open_portal);
+    tcase_add_test(tc_core, test_room_is_walkable_pushable_blocks);
+    tcase_add_test(tc_core, test_room_place_treasure_multiple);
+    tcase_add_test(tc_core, test_room_get_treasure_at_collected);
+    tcase_add_test(tc_core, test_room_try_push_all_directions);
+    tcase_add_test(tc_core, test_room_try_push_invalid_direction);
     suite_add_tcase(s, tc_core);
     return s;
 }

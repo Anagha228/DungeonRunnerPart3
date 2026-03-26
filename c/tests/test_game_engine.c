@@ -737,7 +737,7 @@ END_TEST
 static GameEngine *sw_eng = NULL;
 
 static void switch_setup(void) {
-    Status s = game_engine_create("../assets/example_integration_run (1).ini", &sw_eng);
+    Status s = game_engine_create("../python/example_integration_run (1).ini", &sw_eng);
     ck_assert_int_eq(s, OK);
     ck_assert_ptr_nonnull(sw_eng);
 }

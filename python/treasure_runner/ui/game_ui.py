@@ -142,9 +142,9 @@ class GameUI:
         }
         for i, line in enumerate(room_lines):
             for j, char in enumerate(line):
-                pair, bold = color_map.get(char, (0, 0))
                 try:
-                    self._screen.addch(row + i, 4 + j, char, curses.color_pair(pair) | bold if pair else curses.A_NORMAL)
+                    self._screen.addch(row + i, 4 + j, char, curses.color_pair(color_map[char][0]) | color_map[char][1]
+                                    if char in color_map else curses.A_NORMAL)
                 except curses.error:
                     pass
 

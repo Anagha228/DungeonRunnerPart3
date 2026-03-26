@@ -8,6 +8,7 @@ from .bindings import (
     GameEngine,
     Player,
     Room,
+    CCharset,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "GameEngine",
     "Player",
     "Room",
+    "CCharset"
 ]

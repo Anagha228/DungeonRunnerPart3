@@ -1,6 +1,6 @@
 import ctypes
 from .player import Player
-from ..bindings import Direction, lib, Status
+from ..bindings import Direction, lib, Status, CCharset
 from .exceptions import *
 
 class GameEngine:
@@ -90,3 +90,31 @@ class GameEngine:
         if status != Status.OK:
             raise status_to_status_exception(status, message="")
         return count.value
+
+    def get_charset(self):
+        cs = CCharset()
+        status = lib.game_engine_get_charset(self._eng, ctypes.byref(cs))
+        if status != Status.OK:
+            raise status_to_status_exception(status, message="")
+
+        return Charset(
+            cs.wall.decode(),
+            cs.floor.decode(),
+            cs.player.decode(),
+            cs.pushable.decode(),
+            cs.treasure.decode(),
+            cs.portal.decode(),
+            cs.switch_off.decode(),
+            cs.switch_on.decode(),
+        )
+class Charset:
+    def __init__(self, wall, floor, player, pushable,
+                 treasure, portal, switch_off, switch_on):
+        self.wall = wall
+        self.floor = floor
+        self.player = player
+        self.pushable = pushable
+        self.treasure = treasure
+        self.portal = portal
+        self.switch_off = switch_off
+        self.switch_on = switch_on

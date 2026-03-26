@@ -16,6 +16,7 @@ static Room *find_portal_target(GameEngine *eng, Room *room, int x, int y);
 Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out);
 static bool is_switch_active(Room *room, int switch_id);
 static Status get_entry_position(const Room *r, int *x_out, int *y_out);
+Status game_engine_get_charset(GameEngine *eng, Charset *out);
 /* ============================================================
  * Creation & Destruction
  * ============================================================ */
@@ -513,5 +514,24 @@ Status game_engine_get_total_treasure_count(const GameEngine *eng, int *count_ou
         total += r->treasure_count;
     }
     *count_out = total;
+    return OK;
+}
+
+Status game_engine_get_charset(GameEngine *eng, Charset *out) {
+    if (!eng || !out) {
+        return NULL_POINTER;
+    }
+
+    // assuming your engine already has a charset stored
+    // something like eng->charset
+
+    out->player = eng->charset.player;
+    out->wall = eng->charset.wall;
+    out->treasure = eng->charset.treasure;
+    out->portal = eng->charset.portal;
+    out->pushable = eng->charset.pushable;
+    out->switch_off = eng->charset.switch_off;
+    out->switch_on = eng->charset.switch_on;
+
     return OK;
 }

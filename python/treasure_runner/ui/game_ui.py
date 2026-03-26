@@ -97,36 +97,23 @@ class GameUI:
         self._screen.addstr(row, 0, self._message)
         row = row+1
         self._screen.addstr(row, 0, f"Room Number = {self._engine.get_current_room_id()}  Room Name = {self._engine.get_current_room_name()}")
-        room_lines = self._engine.render_current_room().split("\n")
-        row = row+1
-        # map characters to color pair numbers
-        color_map = {
-            '@': (1, curses.A_BOLD),  # player
-            '$': (2, 0),  # treasure
-            'X': (3, curses.A_BOLD),   # portal
-            'L': (4, 0),  # locked portal
-            'O': (5, 0),  # pushable
-            '#': (6, 0),  # wall
-            '^': (7, 0),  # switch off
-            '*': (8, 0),  # switch on
-        }
-        for i, line in enumerate(room_lines):
-            for j, ch in enumerate(line):
-                entry = color_map.get(ch)
-                if entry:
-                    pair, bold = entry
-                    attr = curses.color_pair(pair) | bold
-                else:
-                    attr = curses.A_NORMAL
-                try:
-                    self._screen.addch(row + i, 4 + j, ch, attr)
-                except curses.error:
-                    pass    
+        self._room_setup(row)
         width, _ = self._engine.get_room_dimensions()
-        legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "X - exit", "L - locked exit", "o - pushable", "^ - switch (off)", "* - switch (on)",]
+        cs = self._engine.get_charset()
+        legend = [
+            "Game Elements:",
+            f"{cs.player} - player",
+            f"{cs.wall} - wall",
+            f"{cs.treasure} - gold",
+            f"{cs.portal} - portal",
+            "L - locked portal",
+            f"{cs.pushable} - pushable",
+            f"{cs.switch_off} - switch (off)",
+            f"{cs.switch_on} - switch (on)",
+        ]
         for i, line in enumerate(legend):
             self._screen.addstr(row + i, 4 + width + 4, line)
-        row = row + len(room_lines)
+        row = row + len(self._engine.render_current_room().split("\n"))
         self._screen.addstr(row, 0, "Game Controls")
         row = row + 1
         self._screen.addstr(row, 0, "Controls: | Arrows/WASD - move | > - portal | r - reset | q - quit")
@@ -138,6 +125,34 @@ class GameUI:
         self._screen.addstr(row, screen_width- len("anagha.19.kulkarni@gmail.com"), "anagha.19.kulkarni@gmail.com")
         self._message = ""
         self._screen.refresh()
+
+    def _room_setup(self, row):
+        room_lines = self._engine.render_current_room().split("\n")
+        row = row+1
+         # map characters to color pair numbers
+        cs = self._engine.get_charset()
+        color_map = {
+            cs.player: (1, curses.A_BOLD),
+            cs.treasure: (2, 0),
+            cs.portal: (3, curses.A_BOLD),
+            'L': (4, 0),
+            cs.pushable: (5, 0),
+            cs.wall: (6, 0),
+            cs.switch_off: (7, 0),
+            cs.switch_on: (8, 0),
+        }
+        for i, line in enumerate(room_lines):
+            for j, char in enumerate(line):
+                entry = color_map.get(char)
+                if entry:
+                    pair, bold = entry
+                    attr = curses.color_pair(pair) | bold
+                else:
+                    attr = curses.A_NORMAL
+                try:
+                    self._screen.addch(row + i, 4 + j, char, attr)
+                except curses.error:
+                    pass
 
     def _handle_input(self, key) -> bool:
         direction_map = {

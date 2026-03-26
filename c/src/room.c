@@ -7,12 +7,16 @@
 #include "datagen.h"
 //helper
 static RoomTileType classify_pushable(const Room *r, int x, int y, int *out_id);
-static void render_base(const Room *r, const Charset *cs, char *buffer);
-static void render_switches(const Room *r, const Charset *cs, char *buffer);
-static void render_treasures(const Room *r, const Charset *cs, char *buffer);
-static void render_portals(const Room *r, const Charset *cs, char *buffer);
-static void render_pushables(const Room *r, const Charset *cs, char *buffer);
-
+static void render_base(const Room *r, const Charset *charset, char *buffer);
+static void render_switches(const Room *r, const Charset *charset, char *buffer);
+static void render_treasures(const Room *r, const Charset *charset, char *buffer);
+static void render_portals(const Room *r, const Charset *charset, char *buffer);
+static void render_pushables(const Room *r, const Charset *charset, char *buffer);
+static bool is_on_switch(const Room *r, int x, int y);
+static bool is_pushable_on_switch(const Room *r, int sx, int sy);
+static bool is_gated_portal_unlocked(const Room *r, int sid);
+static bool is_portal_walkable(const Room *r, int i);
+static bool is_floor(const Room *r, int x, int y);
 /* ============================================================
  * Creation
  * ============================================================ */
@@ -182,52 +186,25 @@ int room_get_portal_destination(const Room *r, int x, int y){
  * ============================================================ */
 
 bool room_is_walkable(const Room *r, int x, int y){
-    if (r == NULL || x>=r->width || y>=r->height || x<0 ||y<0) {
+    if (r == NULL || x < 0 || y < 0 || x >= r->width || y >= r->height) {
         return false;
     }
-    /* Switch tiles are always walkable so pushables can be pushed onto them
-     * and the player can walk through an active switch to reach the portal */
-    for (int i = 0; i < r->switch_count; i++) {
-        if (r->switches[i].x == x && r->switches[i].y == y) {
-            return true;
-        }
-    }
+    if (is_on_switch(r, x, y)) return true;
+
     for (int i = 0; i < r->portal_count; i++) {
         if (r->portals[i].x == x && r->portals[i].y == y) {
-            if (!r->portals[i].gated) {
-                return true;
-            }
-
-            int sid = r->portals[i].required_switch_id;
-
-            for (int j = 0; j < r->switch_count; j++) {
-                if (r->switches[j].id == sid) {
-                    int sx = r->switches[j].x;
-                    int sy = r->switches[j].y;
-
-                    for (int k = 0; k < r->pushable_count; k++) {
-                        if (r->pushables[k].x == sx && r->pushables[k].y == sy) {
-                            return true; // unlocked
-                        }
-                    }
-                }
-            }
-
-            return false; // locked portal
+            return is_portal_walkable(r, i);
         }
     }
+    if (is_pushable_on_switch(r, x, y)) return false;  /* reuse helper */
+
+    /* check actual pushable blocking */
     for (int i = 0; i < r->pushable_count; i++) {
         if (r->pushables[i].x == x && r->pushables[i].y == y) {
             return false;
         }
     }
-    if(r->floor_grid != NULL){
-        return r->floor_grid[y * r->width + x];
-    }
-    if (r->floor_grid == NULL) {
-        return !(x == 0 || y == 0 || x == r->width - 1 || y == r->height - 1);
-    }
-    return false;
+    return is_floor(r, x, y);
 }
 
 static RoomTileType classify_pushable(const Room *r, int x, int y, int *out_id){
@@ -332,9 +309,13 @@ static void render_switches(const Room *r, const Charset *charset, char *buffer)
                     break;
                 }
             }
-            buffer[y * r->width + x] = active
-                ? charset->switch_on
-                : charset->switch_off;
+            int idx = y * r->width + x;
+
+            if (active) {
+                buffer[idx] = charset->switch_on;
+            } else {
+                buffer[idx] = charset->switch_off;
+            }
         }
     }
 }
@@ -351,32 +332,61 @@ static void render_treasures(const Room *r, const Charset *charset, char *buffer
 
 static void render_portals(const Room *r, const Charset *charset, char *buffer) {
     for (int i = 0; i < r->portal_count; i++) {
-        if (r->portals[i].x >= 0 && r->portals[i].y >= 0 && 
-            r->portals[i].x < r->width && r->portals[i].y < r->height) {
-            if (r->portals[i].gated) {
-                int sid = r->portals[i].required_switch_id;
-                bool unlocked = false;
-                /* search for switch by ID, then check if pushable is on it */
-                for (int j = 0; j < r->switch_count; j++) {
-                    if (r->switches[j].id == sid) {
-                        int sx = r->switches[j].x;
-                        int sy = r->switches[j].y;
-                        for (int k = 0; k < r->pushable_count; k++) {
-                            if (r->pushables[k].x == sx && r->pushables[k].y == sy) {
-                                unlocked = true;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-                buffer[r->portals[i].y * r->width + r->portals[i].x] =
-                    unlocked ? charset->portal : 'L';
-            } else {
-                buffer[r->portals[i].y * r->width + r->portals[i].x] = charset->portal;
-            }
+        int px = r->portals[i].x;
+        int py = r->portals[i].y;
+        if (px < 0 || py < 0 || px >= r->width || py >= r->height){ 
+            continue;
+        }
+        char ch;
+        if (!r->portals[i].gated) {
+            ch = charset->portal;
+        } else if (is_gated_portal_unlocked(r, r->portals[i].required_switch_id)) {
+            ch = charset->portal;
+        } else {
+            ch = 'L';
+        }
+        buffer[py * r->width + px] = ch;
+    }
+}
+
+
+static bool is_on_switch(const Room *r, int x, int y) {
+    for (int i = 0; i < r->switch_count; i++) {
+        if (r->switches[i].x == x && r->switches[i].y == y) {
+            return true;
         }
     }
+    return false;
+}
+
+static bool is_pushable_on_switch(const Room *r, int sx, int sy) {
+    for (int k = 0; k < r->pushable_count; k++) {
+        if (r->pushables[k].x == sx && r->pushables[k].y == sy) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool is_gated_portal_unlocked(const Room *r, int sid) {
+    for (int j = 0; j < r->switch_count; j++) {
+        if (r->switches[j].id == sid) {
+            return is_pushable_on_switch(r, r->switches[j].x, r->switches[j].y);
+        }
+    }
+    return false;
+}
+
+static bool is_portal_walkable(const Room *r, int i) {
+    if (!r->portals[i].gated) return true;
+    return is_gated_portal_unlocked(r, r->portals[i].required_switch_id);
+}
+
+static bool is_floor(const Room *r, int x, int y) {
+    if (r->floor_grid != NULL) {
+        return r->floor_grid[y * r->width + x];
+    }
+    return !(x == 0 || y == 0 || x == r->width - 1 || y == r->height - 1);
 }
 
 static void render_pushables(const Room *r, const Charset *charset, char *buffer) {

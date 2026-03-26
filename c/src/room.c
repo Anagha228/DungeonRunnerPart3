@@ -7,6 +7,11 @@
 #include "datagen.h"
 //helper
 static RoomTileType classify_pushable(const Room *r, int x, int y, int *out_id);
+static void render_base(const Room *r, const Charset *cs, char *buffer);
+static void render_switches(const Room *r, const Charset *cs, char *buffer);
+static void render_treasures(const Room *r, const Charset *cs, char *buffer);
+static void render_portals(const Room *r, const Charset *cs, char *buffer);
+static void render_pushables(const Room *r, const Charset *cs, char *buffer);
 
 /* ============================================================
  * Creation
@@ -274,15 +279,27 @@ RoomTileType room_classify_tile(const Room *r, int x, int y, int *out_id){
  * Rendering
  * ============================================================ */
 
-Status room_render(const Room *r, const Charset *charset, char *buffer, int buffer_width, int buffer_height){
-    if(r == NULL || charset == NULL || buffer == NULL ){
-        return INVALID_ARGUMENT;
-    }
-    if(buffer_width != r->width || buffer_height != r->height){
+Status room_render(const Room *r, const Charset *charset, char *buffer,
+                   int buffer_width, int buffer_height) {
+
+    if (r == NULL || charset == NULL || buffer == NULL) {
         return INVALID_ARGUMENT;
     }
 
-    /* Layer 1: floor/wall base */
+    if (buffer_width != r->width || buffer_height != r->height) {
+        return INVALID_ARGUMENT;
+    }
+
+    render_base(r, charset, buffer);
+    render_switches(r, charset, buffer);
+    render_treasures(r, charset, buffer);
+    render_portals(r, charset, buffer);
+    render_pushables(r, charset, buffer);
+
+    return OK;
+}
+
+static void render_base(const Room *r, const Charset *charset, char *buffer) {
     int cell_count = r->width * r->height;
     for (int i = 0; i < cell_count; i++) {
         int row = i / r->width;
@@ -301,8 +318,9 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
             }
         }
     }
+}
 
-    /* Layer 2: switches — active if a pushable is sitting on them */
+static void render_switches(const Room *r, const Charset *charset, char *buffer) {
     for (int i = 0; i < r->switch_count; i++) {
         int x = r->switches[i].x;
         int y = r->switches[i].y;
@@ -319,8 +337,9 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
                 : charset->switch_off;
         }
     }
+}
 
-    /* Layer 3: treasures */
+static void render_treasures(const Room *r, const Charset *charset, char *buffer) {
     for (int i = 0; i < r->treasure_count; i++) {
         if (r->treasures[i].x >= 0 && r->treasures[i].y >= 0 && 
             r->treasures[i].x < r->width && r->treasures[i].y < r->height
@@ -328,8 +347,9 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
             buffer[r->treasures[i].y * r->width + r->treasures[i].x] = charset->treasure;
         }
     }
-    
-    /* Layer 4: portals — locked portals show as switch_off, open as portal */
+}
+
+static void render_portals(const Room *r, const Charset *charset, char *buffer) {
     for (int i = 0; i < r->portal_count; i++) {
         if (r->portals[i].x >= 0 && r->portals[i].y >= 0 && 
             r->portals[i].x < r->width && r->portals[i].y < r->height) {
@@ -357,7 +377,9 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
             }
         }
     }
+}
 
+static void render_pushables(const Room *r, const Charset *charset, char *buffer) {
     /* Layer 5: pushables — skip if sitting on a switch (consumed case) */
     for (int i = 0; i < r->pushable_count; i++) {
         int x = r->pushables[i].x;
@@ -374,9 +396,6 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
             buffer[y * r->width + x] = charset->pushable;
         }
     }
-
-
-    return OK;
 }
 
 /* ============================================================

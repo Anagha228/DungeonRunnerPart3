@@ -17,6 +17,8 @@ Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out)
 static bool is_switch_active(Room *room, int switch_id);
 static Status get_entry_position(const Room *r, int *x_out, int *y_out);
 Status game_engine_get_charset(GameEngine *eng, Charset *out);
+static Status handle_push(Room *room, Player *p, int nx, int ny, Direction dir);
+static Status handle_portal(GameEngine *eng, Player *p, Room *current_room, int nx, int ny);
 /* ============================================================
  * Creation & Destruction
  * ============================================================ */
@@ -151,66 +153,28 @@ Status game_engine_move_player(GameEngine *eng, Direction dir){
         case DIR_EAST:  nx++; break;
         default: return INVALID_ARGUMENT;
     }
-
     /* Step 1: collect treasure at destination */
     if (try_collect_at(current_room, p, nx, ny)) {
         return OK;
     }
-
     /* Step 2: try to push a pushable */
-    int pushable_idx = -1;
-    if (room_has_pushable_at(current_room, nx, ny, &pushable_idx)) {
-        /* Check if pushable is on a switch */
-        bool on_switch = false;
-        for (int i = 0; i < current_room->switch_count; i++) {
-            if (current_room->switches[i].x == nx &&
-                current_room->switches[i].y == ny) {
-                on_switch = true;
-                break;
-            }
-        }
-        if (on_switch) {
-            /* Treat like empty tile — allow walking */
-            player_set_position(p, nx, ny);
-            return OK;
-        }
-        if (room_try_push(current_room, pushable_idx, dir) != OK) {
-            return ROOM_IMPASSABLE;
-        }
-        player_set_position(p, nx, ny);
+    s = handle_push(current_room, p, nx, ny, dir);
+    if (s == OK){
         return OK;
     }
-
+    if (s == ROOM_IMPASSABLE) {
+        return ROOM_IMPASSABLE;
+    }
     /* Step 3: check if destination is a locked portal BEFORE walkability check
      * Portal tiles on walls are not walkable, so we must check portals first */
-    Room *target_room = find_portal_target(eng, current_room, nx, ny);
-    if (target_room != NULL) {
-        s = player_move_to_room(p, target_room->id);
-        if (s != OK) return INTERNAL_ERROR;
-        int entry_x = 1, entry_y = 1;
-        get_entry_position(target_room, &entry_x, &entry_y);
-        if (room_get_portal_destination(target_room, entry_x, entry_y) != -1) {
-            for (int row = 1; row < target_room->height - 1; row++) {
-                for (int col = 1; col < target_room->width - 1; col++) {
-                    if (room_is_walkable(target_room, col, row) &&
-                        room_get_portal_destination(target_room, col, row) == -1) {
-                        entry_x = col;
-                        entry_y = row;
-                        goto found;
-                    }
-                }
-            }
-            found:;
-        }
-        player_set_position(p, entry_x, entry_y);
+    s = handle_portal(eng, p, current_room, nx, ny);
+    if (s == OK){
         return OK;
     }
-
     /* Step 4: check walkability for non-portal tiles */
     if (!room_is_walkable(current_room, nx, ny)) {
         return ROOM_IMPASSABLE;
     }
-
     /* Step 5: normal move */
     player_set_position(p, nx, ny);
     return OK;
@@ -249,7 +213,6 @@ static Status get_entry_position(const Room *r, int *x_out, int *y_out) {
     if (room_get_start_position(r, x_out, y_out) != OK) {
         return ROOM_NOT_FOUND;
     }
-
     /* check 4 neighbours of the portal position for a walkable interior tile */
     int dx[] = {0, 0, -1, 1};
     int dy[] = {-1, 1, 0, 0};
@@ -264,7 +227,6 @@ static Status get_entry_position(const Room *r, int *x_out, int *y_out) {
             return OK;
         }
     }
-
     /* no valid neighbour found, fall back to any interior walkable tile */
     for (int row = 1; row < r->height - 1; row++) {
         for (int col = 1; col < r->width - 1; col++) {
@@ -278,6 +240,59 @@ static Status get_entry_position(const Room *r, int *x_out, int *y_out) {
     }
 
     return ROOM_NOT_FOUND;
+}
+
+static Status handle_push(Room *current_room, Player *p, int nx, int ny, Direction dir) {
+    int pushable_idx = -1;
+    if (!room_has_pushable_at(current_room, nx, ny, &pushable_idx)) {
+        return GE_NO_SUCH_ROOM;
+    }
+    /* Check if pushable is on a switch */
+    bool on_switch = false;
+    for (int i = 0; i < current_room->switch_count; i++) {
+        if (current_room->switches[i].x == nx &&
+            current_room->switches[i].y == ny) {
+            on_switch = true;
+            break;
+        }
+    }
+    if (on_switch) {
+        // Treat like empty tile
+        player_set_position(p, nx, ny);
+        return OK;
+    }
+    if (room_try_push(current_room, pushable_idx, dir) != OK) {
+        return ROOM_IMPASSABLE;
+    }
+    player_set_position(p, nx, ny);
+    return OK;
+}
+
+static Status handle_portal(GameEngine *eng, Player *p, Room *current_room, int nx, int ny) {
+    Room *target_room = find_portal_target(eng, current_room, nx, ny);
+    if (target_room != NULL) {
+        Status s = player_move_to_room(p, target_room->id);
+        if (s != OK) return INTERNAL_ERROR;
+        int entry_x = 1;
+        int entry_y = 1;
+        get_entry_position(target_room, &entry_x, &entry_y);
+        if (room_get_portal_destination(target_room, entry_x, entry_y) != -1) {
+            for (int row = 1; row < target_room->height - 1; row++) {
+                for (int col = 1; col < target_room->width - 1; col++) {
+                    if (room_is_walkable(target_room, col, row) &&
+                        room_get_portal_destination(target_room, col, row) == -1) {
+                        entry_x = col;
+                        entry_y = row;
+                        goto found;
+                    }
+                }
+            }
+            found:;
+        }
+        player_set_position(p, entry_x, entry_y);
+        return OK;
+    }
+    return ROOM_IMPASSABLE; 
 }
 
 Status game_engine_get_room_count(const GameEngine *eng, int *count_out){
@@ -521,10 +536,6 @@ Status game_engine_get_charset(GameEngine *eng, Charset *out) {
     if (!eng || !out) {
         return NULL_POINTER;
     }
-
-    // assuming your engine already has a charset stored
-    // something like eng->charset
-
     out->player = eng->charset.player;
     out->wall = eng->charset.wall;
     out->treasure = eng->charset.treasure;

@@ -17,6 +17,16 @@ class GameUI:
         self._screen = stdscr
         # turn off cursor with curses.curs_set(0)
         curses.curs_set(0)
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_GREEN,   curses.COLOR_BLACK)  # player
+        curses.init_pair(2, curses.COLOR_YELLOW,  curses.COLOR_BLACK)  # treasure
+        curses.init_pair(3, curses.COLOR_CYAN,    curses.COLOR_BLACK)  # portal
+        curses.init_pair(4, curses.COLOR_RED,     curses.COLOR_BLACK)  # locked portal
+        curses.init_pair(5, curses.COLOR_MAGENTA, curses.COLOR_BLACK)  # pushable
+        curses.init_pair(6, curses.COLOR_BLUE,    curses.COLOR_BLACK)  # wall
+        curses.init_pair(7, curses.COLOR_WHITE,   curses.COLOR_BLACK)  # switch off
+        curses.init_pair(8, curses.COLOR_GREEN,   curses.COLOR_BLACK)  # switch on
         # call _show_splash
         self._show_splash()
         # call _game_loop
@@ -87,16 +97,36 @@ class GameUI:
         self._screen.addstr(row, 0, self._message)
         row = row+1
         self._screen.addstr(row, 0, f"Room Number = {self._engine.get_current_room_id()}  Room Name = {self._engine.get_current_room_name()}")
-        room_setup = self._engine.render_current_room()
-        room_setup = room_setup.split("\n")
-        row = row + 1
-        for i, line in enumerate(room_setup):
-            self._screen.addstr(row + i, 4, line)
+        room_lines = self._engine.render_current_room().split("\n")
+        row = row+1
+        # map characters to color pair numbers
+        color_map = {
+            '@': (1, curses.A_BOLD),  # player
+            '$': (2, 0),  # treasure
+            'X': (3, curses.A_BOLD),   # portal
+            'L': (4, 0),  # locked portal
+            'O': (5, 0),  # pushable
+            '#': (6, 0),  # wall
+            '^': (7, 0),  # switch off
+            '*': (8, 0),  # switch on
+        }
+        for i, line in enumerate(room_lines):
+            for j, ch in enumerate(line):
+                entry = color_map.get(ch)
+                if entry:
+                    pair, bold = entry
+                    attr = curses.color_pair(pair) | bold
+                else:
+                    attr = curses.A_NORMAL
+                try:
+                    self._screen.addch(row + i, 4 + j, ch, attr)
+                except curses.error:
+                    pass    
         width, _ = self._engine.get_room_dimensions()
-        legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "x - exit", "o - pushable", "^ - switch (off)", "* - switch (on)",]
+        legend = ["Game Elements:", "@ - player", "# - wall", "$ - gold", "X - exit", "L - locked exit", "o - pushable", "^ - switch (off)", "* - switch (on)",]
         for i, line in enumerate(legend):
             self._screen.addstr(row + i, 4 + width + 4, line)
-        row = row + len(room_setup)
+        row = row + len(room_lines)
         self._screen.addstr(row, 0, "Game Controls")
         row = row + 1
         self._screen.addstr(row, 0, "Controls: | Arrows/WASD - move | > - portal | r - reset | q - quit")
@@ -110,55 +140,37 @@ class GameUI:
         self._screen.refresh()
 
     def _handle_input(self, key) -> bool:
-        if key in (curses.KEY_UP, ord('w')):
-            # move north
+        direction_map = {
+            curses.KEY_UP: Direction.NORTH,
+            ord('w'): Direction.NORTH,
+            curses.KEY_DOWN: Direction.SOUTH,
+            ord('s'): Direction.SOUTH,
+            curses.KEY_LEFT: Direction.WEST,
+            ord('a'): Direction.WEST,
+            curses.KEY_RIGHT: Direction.EAST,
+            ord('d'): Direction.EAST,
+        }
+        if key in direction_map:
             before = self._engine.player.get_collected_count()
-            self._engine.move_player(Direction.NORTH)
-            if before < self._engine.player.get_collected_count():
-                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
-            else:
-                self._message = self._engine.last_message
-        elif key in (curses.KEY_DOWN, ord('s')):
-            # move south
-            before = self._engine.player.get_collected_count()
-            self._engine.move_player(Direction.SOUTH)
-            if before < self._engine.player.get_collected_count():
-                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
-            else:
-                self._message = self._engine.last_message
-        elif key in (curses.KEY_LEFT, ord('a')):
-            # move west
-            before = self._engine.player.get_collected_count()
-            self._engine.move_player(Direction.WEST)
-            if before < self._engine.player.get_collected_count():
-                self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
-            else:
-                self._message = self._engine.last_message
-        elif key in (curses.KEY_RIGHT, ord('d')):
-            # move east
-            before = self._engine.player.get_collected_count()
-            self._engine.move_player(Direction.EAST)
+            self._engine.move_player(direction_map[key])
             if before < self._engine.player.get_collected_count():
                 self._message = f"Picked up Gold!!! {self._engine.player.get_collected_count()}/{self._engine.get_total_treasures()} treasures"
             else:
                 self._message = self._engine.last_message
         elif key == ord('>'):
-            # use portal
             self._message = "Walk into a portal to use it."
         elif key == ord('r'):
-            # reset
             self._engine.reset()
             self._message = self._engine.last_message
-        elif key == ord('q'):
-            return False
-        elif key == ord('x'):
+        elif key in (ord('q'), ord('x')):
             return False
         return True
+
 
     def _show_quit_screen(self) -> None:
         try:
             self._screen.clear()
-            screen_height, screen_width = self._screen.getmaxyx()
+            _, screen_width = self._screen.getmaxyx()
             row = 0
             col = (screen_width - len("GAME OVER!!!")) // 2
             self._screen.addstr(row, col, "GAME OVER!!!")

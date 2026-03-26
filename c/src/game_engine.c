@@ -184,20 +184,23 @@ Status game_engine_move_player(GameEngine *eng, Direction dir){
      * Portal tiles on walls are not walkable, so we must check portals first */
     Room *target_room = find_portal_target(eng, current_room, nx, ny);
     if (target_room != NULL) {
-        player_move_to_room(p, target_room->id);
-
+        s = player_move_to_room(p, target_room->id);
+        if (s != OK) return INTERNAL_ERROR;
         int entry_x = 1, entry_y = 1;
-        for (int row = 1; row < target_room->height - 1; row++) {
-            for (int col = 1; col < target_room->width - 1; col++) {
-                if (room_is_walkable(target_room, col, row) &&
-                    room_get_portal_destination(target_room, col, row) == -1) {
-                    entry_x = col;
-                    entry_y = row;
-                    goto found;
+        room_get_start_position(target_room, &entry_x, &entry_y);
+        if (room_get_portal_destination(target_room, entry_x, entry_y) != -1) {
+            for (int row = 1; row < target_room->height - 1; row++) {
+                for (int col = 1; col < target_room->width - 1; col++) {
+                    if (room_is_walkable(target_room, col, row) &&
+                        room_get_portal_destination(target_room, col, row) == -1) {
+                        entry_x = col;
+                        entry_y = row;
+                        goto found;
+                    }
                 }
             }
+            found:;
         }
-    found:
         player_set_position(p, entry_x, entry_y);
         return OK;
     }

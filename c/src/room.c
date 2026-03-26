@@ -319,17 +319,8 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
                 : charset->switch_off;
         }
     }
-
-    /* Layer 3: treasures */
-    for (int i = 0; i < r->treasure_count; i++) {
-        if (r->treasures[i].x >= 0 && r->treasures[i].y >= 0 && 
-            r->treasures[i].x < r->width && r->treasures[i].y < r->height
-            && !r->treasures[i].collected) {
-            buffer[r->treasures[i].y * r->width + r->treasures[i].x] = charset->treasure;
-        }
-    }
-
-    /* Layer 4: portals — locked portals show as switch_off, open as portal */
+    
+    /* Layer 3: portals — locked portals show as switch_off, open as portal */
     for (int i = 0; i < r->portal_count; i++) {
         if (r->portals[i].x >= 0 && r->portals[i].y >= 0 && 
             r->portals[i].x < r->width && r->portals[i].y < r->height) {
@@ -351,14 +342,14 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
                     }
                 }
                 buffer[r->portals[i].y * r->width + r->portals[i].x] =
-                    unlocked ? charset->portal : charset->switch_off;
+                    unlocked ? charset->portal : 'L';
             } else {
                 buffer[r->portals[i].y * r->width + r->portals[i].x] = charset->portal;
             }
         }
     }
 
-    /* Layer 5: pushables — skip if sitting on a switch (consumed case) */
+    /* Layer 4: pushables — skip if sitting on a switch (consumed case) */
     for (int i = 0; i < r->pushable_count; i++) {
         int x = r->pushables[i].x;
         int y = r->pushables[i].y;
@@ -375,6 +366,16 @@ Status room_render(const Room *r, const Charset *charset, char *buffer, int buff
         }
     }
 
+    /* Layer 5: treasures */
+    for (int i = 0; i < r->treasure_count; i++) {
+        if (r->treasures[i].x >= 0 && r->treasures[i].y >= 0 && 
+            r->treasures[i].x < r->width && r->treasures[i].y < r->height
+            && !r->treasures[i].collected) {
+            buffer[r->treasures[i].y * r->width + r->treasures[i].x] = charset->treasure;
+        }
+    }
+
+
     return OK;
 }
 
@@ -386,22 +387,41 @@ Status room_get_start_position(const Room *r, int *x_out, int *y_out){
     if(r == NULL || x_out == NULL || y_out == NULL){
         return INVALID_ARGUMENT;
     }
-    if (r->portals != NULL) {
-        for (int i = 0; i < r->portal_count; i++) {
-            *x_out = r->portals[i].x;
-            *y_out = r->portals[i].y;
-            return OK;
+
+    /* Preference 1: first interior walkable tile adjacent to a portal */
+    for (int i = 0; i < r->portal_count; i++) {
+        int px = r->portals[i].x;
+        int py = r->portals[i].y;
+
+        /* Check all 4 neighbours of the portal */
+        int dx[] = {0, 0, -1, 1};
+        int dy[] = {-1, 1, 0, 0};
+        for (int d = 0; d < 4; d++) {
+            int cx = px + dx[d];
+            int cy = py + dy[d];
+            /* Must be interior (not on the border) and walkable */
+            if (cx > 0 && cy > 0 && cx < r->width - 1 && cy < r->height - 1
+                && room_is_walkable(r, cx, cy)
+                && room_get_portal_destination(r, cx, cy) == -1) {
+                *x_out = cx;
+                *y_out = cy;
+                return OK;
+            }
         }
     }
-    for (int col = 1; col < r->width - 1; col++) {
-        for (int row = 1; row < r->height - 1; row++) {
-            if (room_is_walkable(r, col, row)) {
+
+    /* Preference 2: any interior walkable tile */
+    for (int row = 1; row < r->height - 1; row++) {
+        for (int col = 1; col < r->width - 1; col++) {
+            if (room_is_walkable(r, col, row)
+                && room_get_portal_destination(r, col, row) == -1) {
                 *x_out = col;
                 *y_out = row;
                 return OK;
             }
         }
     }
+
     return ROOM_NOT_FOUND;
 }
 

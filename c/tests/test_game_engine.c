@@ -560,19 +560,15 @@ END_TEST
 /* ============================================================
  * Treasure collection via movement
  * ============================================================ */
-START_TEST(test_collect_treasure_on_move)
-{
-    const Player *p = game_engine_get_player(eng);
-    int x = p->x;
-    int y = p->y;
 
-    /* place a treasure adjacent to player and walk into it */
+START_TEST(test_collect_treasure_on_move){
+    const Player *p = game_engine_get_player(eng);
+    int before = p->collected_count;
+
     int *ids = NULL;
     int count = 0;
     game_engine_get_room_ids(eng, &ids, &count);
 
-    /* move in all directions and check if collected count increases */
-    int before = p->collected_count;
     game_engine_move_player(eng, DIR_NORTH);
     game_engine_move_player(eng, DIR_SOUTH);
     game_engine_move_player(eng, DIR_EAST);
@@ -582,6 +578,7 @@ START_TEST(test_collect_treasure_on_move)
     free(ids);
 }
 END_TEST
+
 
 /* ============================================================
  * Room render size correct
@@ -737,6 +734,178 @@ START_TEST(test_free_string_null)
 }
 END_TEST
 
+static GameEngine *sw_eng = NULL;
+
+static void switch_setup(void) {
+    Status s = game_engine_create("../assets/example_integration_run (1).ini", &sw_eng);
+    ck_assert_int_eq(s, OK);
+    ck_assert_ptr_nonnull(sw_eng);
+}
+
+static void switch_teardown(void) {
+    if (sw_eng != NULL) {
+        game_engine_destroy(sw_eng);
+        sw_eng = NULL;
+    }
+}
+
+/* ============================================================
+ * Switch world creation
+ * ============================================================ */
+START_TEST(test_switch_engine_create)
+{
+    ck_assert_ptr_nonnull(sw_eng->player);
+    ck_assert_ptr_nonnull(sw_eng->graph);
+}
+END_TEST
+
+START_TEST(test_switch_world_room_count)
+{
+    int count = 0;
+    ck_assert_int_eq(game_engine_get_room_count(sw_eng, &count), OK);
+    ck_assert_int_eq(count, 8);
+}
+END_TEST
+
+START_TEST(test_switch_world_treasure_count)
+{
+    int total = 0;
+    ck_assert_int_eq(game_engine_get_total_treasure_count(sw_eng, &total), OK);
+    ck_assert_int_gt(total, 0);
+}
+END_TEST
+
+/* ============================================================
+ * Switch world movement
+ * ============================================================ */
+START_TEST(test_switch_world_move_all_directions)
+{
+    Status s1 = game_engine_move_player(sw_eng, DIR_NORTH);
+    Status s2 = game_engine_move_player(sw_eng, DIR_SOUTH);
+    Status s3 = game_engine_move_player(sw_eng, DIR_EAST);
+    Status s4 = game_engine_move_player(sw_eng, DIR_WEST);
+
+    ck_assert(s1 == OK || s1 == ROOM_IMPASSABLE);
+    ck_assert(s2 == OK || s2 == ROOM_IMPASSABLE);
+    ck_assert(s3 == OK || s3 == ROOM_IMPASSABLE);
+    ck_assert(s4 == OK || s4 == ROOM_IMPASSABLE);
+}
+END_TEST
+
+START_TEST(test_switch_world_render)
+{
+    char *out = NULL;
+    ck_assert_int_eq(game_engine_render_current_room(sw_eng, &out), OK);
+    ck_assert_ptr_nonnull(out);
+    ck_assert_ptr_nonnull(strchr(out, '@'));
+    game_engine_free_string(out);
+}
+END_TEST
+
+START_TEST(test_switch_world_render_contains_switch)
+{
+    /* render all rooms and check at least one has a switch character */
+    int *ids = NULL;
+    int count = 0;
+    game_engine_get_room_ids(sw_eng, &ids, &count);
+
+    bool found_switch = false;
+    for (int i = 0; i < count; i++) {
+        char *out = NULL;
+        game_engine_render_room(sw_eng, ids[i], &out);
+        if (strchr(out, '^') != NULL || strchr(out, '*') != NULL) {
+            found_switch = true;
+        }
+        game_engine_free_string(out);
+    }
+    ck_assert(found_switch);
+    free(ids);
+}
+END_TEST
+
+START_TEST(test_switch_world_render_contains_locked_portal)
+{
+    int *ids = NULL;
+    int count = 0;
+    game_engine_get_room_ids(sw_eng, &ids, &count);
+
+    bool found_locked = false;
+    for (int i = 0; i < count; i++) {
+        char *out = NULL;
+        game_engine_render_room(sw_eng, ids[i], &out);
+        if (strchr(out, 'L') != NULL) {
+            found_locked = true;
+        }
+        game_engine_free_string(out);
+    }
+    ck_assert(found_locked);
+    free(ids);
+}
+END_TEST
+
+/* ============================================================
+ * Switch world reset
+ * ============================================================ */
+START_TEST(test_switch_world_reset)
+{
+    const Player *p = game_engine_get_player(sw_eng);
+    int initial_room = p->room_id;
+    int initial_x = p->x;
+    int initial_y = p->y;
+
+    for (int i = 0; i < 10; i++) {
+        game_engine_move_player(sw_eng, DIR_EAST);
+        game_engine_move_player(sw_eng, DIR_SOUTH);
+    }
+
+    ck_assert_int_eq(game_engine_reset(sw_eng), OK);
+    p = game_engine_get_player(sw_eng);
+    ck_assert_int_eq(p->room_id, initial_room);
+    ck_assert_int_eq(p->x, initial_x);
+    ck_assert_int_eq(p->y, initial_y);
+    ck_assert_int_eq(p->collected_count, 0);
+}
+END_TEST
+
+/* ============================================================
+ * Switch world player stays in bounds
+ * ============================================================ */
+START_TEST(test_switch_world_player_in_bounds)
+{
+    for (int i = 0; i < 30; i++) {
+        game_engine_move_player(sw_eng, DIR_NORTH);
+        game_engine_move_player(sw_eng, DIR_EAST);
+        game_engine_move_player(sw_eng, DIR_SOUTH);
+        game_engine_move_player(sw_eng, DIR_WEST);
+    }
+
+    const Player *p = game_engine_get_player(sw_eng);
+    int w = 0, h = 0;
+    game_engine_get_room_dimensions(sw_eng, &w, &h);
+    ck_assert_int_ge(p->x, 0);
+    ck_assert_int_ge(p->y, 0);
+    ck_assert_int_lt(p->x, w);
+    ck_assert_int_lt(p->y, h);
+}
+END_TEST
+
+START_TEST(test_switch_world_collected_never_exceeds_total)
+{
+    int total = 0;
+    game_engine_get_total_treasure_count(sw_eng, &total);
+
+    for (int i = 0; i < 20; i++) {
+        game_engine_move_player(sw_eng, DIR_NORTH);
+        game_engine_move_player(sw_eng, DIR_EAST);
+        game_engine_move_player(sw_eng, DIR_SOUTH);
+        game_engine_move_player(sw_eng, DIR_WEST);
+    }
+
+    const Player *p = game_engine_get_player(sw_eng);
+    ck_assert_int_le(p->collected_count, total);
+}
+END_TEST
+
 /* ============================================================
  * Suite Setup
  * ============================================================ */
@@ -797,6 +966,23 @@ Suite *game_engine_suite(void) {
     tcase_add_test(tc_core, test_render_stable);
     tcase_add_test(tc_core, test_free_string_null);
     suite_add_tcase(s, tc_core);
+
+    TCase *tc_switch = tcase_create("Switch");
+    tcase_add_checked_fixture(tc_switch, switch_setup, switch_teardown);
+
+    tcase_add_test(tc_switch, test_switch_engine_create);
+    tcase_add_test(tc_switch, test_switch_world_room_count);
+    tcase_add_test(tc_switch, test_switch_world_treasure_count);
+    tcase_add_test(tc_switch, test_switch_world_move_all_directions);
+    tcase_add_test(tc_switch, test_switch_world_render);
+    tcase_add_test(tc_switch, test_switch_world_render_contains_switch);
+    tcase_add_test(tc_switch, test_switch_world_render_contains_locked_portal);
+    tcase_add_test(tc_switch, test_switch_world_reset);
+    tcase_add_test(tc_switch, test_switch_world_player_in_bounds);
+    tcase_add_test(tc_switch, test_switch_world_collected_never_exceeds_total);
+
+    suite_add_tcase(s, tc_switch);
+
     return s;
 }
 

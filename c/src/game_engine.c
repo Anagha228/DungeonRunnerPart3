@@ -15,7 +15,7 @@ static bool try_collect_at(Room *room, Player *p, int x, int y);
 static Room *find_portal_target(GameEngine *eng, Room *room, int x, int y);
 Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out);
 static bool is_switch_active(Room *room, int switch_id);
-
+static Status get_entry_position(const Room *r, int *x_out, int *y_out);
 /* ============================================================
  * Creation & Destruction
  * ============================================================ */
@@ -187,7 +187,7 @@ Status game_engine_move_player(GameEngine *eng, Direction dir){
         s = player_move_to_room(p, target_room->id);
         if (s != OK) return INTERNAL_ERROR;
         int entry_x = 1, entry_y = 1;
-        room_get_start_position(target_room, &entry_x, &entry_y);
+        get_entry_position(target_room, &entry_x, &entry_y);
         if (room_get_portal_destination(target_room, entry_x, entry_y) != -1) {
             for (int row = 1; row < target_room->height - 1; row++) {
                 for (int col = 1; col < target_room->width - 1; col++) {
@@ -244,6 +244,40 @@ static Room *find_portal_target(GameEngine *eng, Room *room, int x, int y) {
     return NULL;
 }
 
+static Status get_entry_position(const Room *r, int *x_out, int *y_out) {
+    if (room_get_start_position(r, x_out, y_out) != OK) {
+        return ROOM_NOT_FOUND;
+    }
+
+    /* check 4 neighbours of the portal position for a walkable interior tile */
+    int dx[] = {0, 0, -1, 1};
+    int dy[] = {-1, 1, 0, 0};
+    for (int d = 0; d < 4; d++) {
+        int cx = *x_out + dx[d];
+        int cy = *y_out + dy[d];
+        if (cx > 0 && cy > 0 && cx < r->width - 1 && cy < r->height - 1
+            && room_is_walkable(r, cx, cy)
+            && room_get_portal_destination(r, cx, cy) == -1) {
+            *x_out = cx;
+            *y_out = cy;
+            return OK;
+        }
+    }
+
+    /* no valid neighbour found, fall back to any interior walkable tile */
+    for (int row = 1; row < r->height - 1; row++) {
+        for (int col = 1; col < r->width - 1; col++) {
+            if (room_is_walkable(r, col, row)
+                && room_get_portal_destination(r, col, row) == -1) {
+                *x_out = col;
+                *y_out = row;
+                return OK;
+            }
+        }
+    }
+
+    return ROOM_NOT_FOUND;
+}
 
 Status game_engine_get_room_count(const GameEngine *eng, int *count_out){
     if (eng == NULL ){

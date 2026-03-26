@@ -19,6 +19,9 @@ static Status get_entry_position(const Room *r, int *x_out, int *y_out);
 Status game_engine_get_charset(GameEngine *eng, Charset *out);
 static Status handle_push(Room *room, Player *p, int nx, int ny, Direction dir);
 static Status handle_portal(GameEngine *eng, Player *p, Room *current_room, int nx, int ny);
+Status game_engine_get_total_treasure_count(const GameEngine *eng, int *count_out);
+Status game_engine_get_current_room_name(const GameEngine *eng, char **name_out);
+
 /* ============================================================
  * Creation & Destruction
  * ============================================================ */
@@ -46,7 +49,8 @@ Status game_engine_create(const char *config_file_path, GameEngine **engine_out)
 
     engine->player->room_id = first_room->id;
     engine->initial_room_id = first_room->id;
-    if(room_get_start_position(first_room, &engine->initial_player_x, &engine->initial_player_y)!=OK){
+    if (get_entry_position(first_room, &engine->initial_player_x, &engine->initial_player_y) != OK) {
+        game_engine_destroy(engine);
         return NO_MEMORY;
     }
     engine->player->x = engine->initial_player_x;

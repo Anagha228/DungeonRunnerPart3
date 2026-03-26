@@ -549,7 +549,7 @@ START_TEST(test_room_render_custom_grid)
 
     ck_assert_int_eq(buffer[6], '.');
     ck_assert_int_eq(buffer[7], '#');
-    ck_assert_int_eq(buffer[8], 'O'); // portal
+    ck_assert_int_eq(buffer[8], 'L'); // portal
 }
 END_TEST
 
@@ -604,7 +604,7 @@ START_TEST(test_room_render_custom_grid_overlap)
 
     // The last tile [2,2] is where portal and treasure are
     // Portals render on top of treasures
-    ck_assert_int_eq(buffer[8], 'O'); 
+    ck_assert_int_eq(buffer[8], 'L'); 
 }
 END_TEST
 

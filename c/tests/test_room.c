@@ -1007,6 +1007,159 @@ START_TEST(test_room_try_push_invalid_direction)
 END_TEST
 
 /* ============================================================
+ * room_set_floor_grid replace existing
+ * ============================================================ */
+START_TEST(test_room_set_floor_grid_replace)
+{
+    bool *grid1 = malloc(9 * sizeof(bool));
+    bool *grid2 = malloc(9 * sizeof(bool));
+    for (int i = 0; i < 9; i++) {
+        grid1[i] = true;
+        grid2[i] = false;
+    }
+    room_set_floor_grid(r, grid1);
+    ck_assert_int_eq(room_set_floor_grid(r, grid2), OK);
+    for (int i = 0; i < 9; i++) {
+        ck_assert_int_eq(r->floor_grid[i], false);
+    }
+}
+END_TEST
+
+/* ============================================================
+ * room_set_portals replace existing
+ * ============================================================ */
+START_TEST(test_room_set_portals_replace)
+{
+    Portal *p1 = malloc(sizeof(Portal));
+    p1->x = 0; p1->y = 1; p1->target_room_id = 10;
+    p1->name = strdup("P1");
+    room_set_portals(r, p1, 1);
+
+    Portal *p2 = malloc(sizeof(Portal));
+    p2->x = 1; p2->y = 0; p2->target_room_id = 20;
+    p2->name = strdup("P2");
+    ck_assert_int_eq(room_set_portals(r, p2, 1), OK);
+
+    ck_assert_int_eq(room_get_portal_destination(r, 1, 0), 20);
+    ck_assert_int_eq(room_get_portal_destination(r, 0, 1), -1);
+}
+END_TEST
+
+/* ============================================================
+ * room_set_treasures replace existing
+ * ============================================================ */
+START_TEST(test_room_set_treasures_replace)
+{
+    Treasure *t1 = malloc(sizeof(Treasure));
+    t1->id = 1; t1->x = 1; t1->y = 1;
+    t1->name = strdup("Old");
+    t1->collected = false;
+    room_set_treasures(r, t1, 1);
+
+    Treasure *t2 = malloc(sizeof(Treasure));
+    t2->id = 2; t2->x = 2; t2->y = 2;
+    t2->name = strdup("New");
+    t2->collected = false;
+    ck_assert_int_eq(room_set_treasures(r, t2, 1), OK);
+
+    ck_assert_int_eq(room_get_treasure_at(r, 2, 2), 2);
+    ck_assert_int_eq(room_get_treasure_at(r, 1, 1), -1);
+}
+END_TEST
+
+/* ============================================================
+ * room_get_portal_destination null room
+ * ============================================================ */
+START_TEST(test_room_get_portal_destination_no_portals)
+{
+    ck_assert_int_eq(room_get_portal_destination(r, 0, 0), -1);
+    ck_assert_int_eq(room_get_portal_destination(NULL, 0, 0), -1);
+}
+END_TEST
+
+/* ============================================================
+ * room_get_treasure_at null room
+ * ============================================================ */
+START_TEST(test_room_get_treasure_at_null)
+{
+    ck_assert_int_eq(room_get_treasure_at(NULL, 0, 0), -1);
+    ck_assert_int_eq(room_get_treasure_at(r, 0, 0), -1);
+}
+END_TEST
+
+/* ============================================================
+ * room_classify_tile out of bounds
+ * ============================================================ */
+START_TEST(test_room_classify_tile_oob)
+{
+    ck_assert_int_eq(room_classify_tile(r, -1, -1, NULL), ROOM_TILE_INVALID);
+    ck_assert_int_eq(room_classify_tile(r, r->width, 0, NULL), ROOM_TILE_INVALID);
+    ck_assert_int_eq(room_classify_tile(r, 0, r->height, NULL), ROOM_TILE_INVALID);
+}
+END_TEST
+
+/* ============================================================
+ * room_pick_up_treasure then get returns -1
+ * ============================================================ */
+START_TEST(test_room_pick_up_then_get)
+{
+    Treasure *t = malloc(sizeof(Treasure));
+    t->id = 55; t->x = 1; t->y = 1;
+    t->name = strdup("Coin");
+    t->collected = false;
+    room_set_treasures(r, t, 1);
+
+    ck_assert_int_eq(room_get_treasure_at(r, 1, 1), 55);
+
+    Treasure *out = NULL;
+    ck_assert_int_eq(room_pick_up_treasure(r, 55, &out), OK);
+    ck_assert_int_eq(room_get_treasure_at(r, 1, 1), -1);
+}
+END_TEST
+
+/* ============================================================
+ * room_render with treasure on portal (portal wins)
+ * ============================================================ */
+START_TEST(test_room_render_portal_over_treasure)
+{
+    Charset cs = { .floor = '.', .wall = '#', .treasure = '$', .portal = 'X',
+                   .pushable = 'O', .switch_on = '*', .switch_off = '^' };
+    char buffer[9];
+
+    Portal *p = malloc(sizeof(Portal));
+    p->x = 1; p->y = 1; p->target_room_id = 5;
+    p->gated = false;
+    p->name = strdup("P");
+    room_set_portals(r, p, 1);
+
+    Treasure *t = malloc(sizeof(Treasure));
+    t->id = 1; t->x = 1; t->y = 1;
+    t->name = strdup("Gold");
+    t->collected = false;
+    room_set_treasures(r, t, 1);
+
+    ck_assert_int_eq(room_render(r, &cs, buffer, 3, 3), OK);
+    ck_assert_int_eq(buffer[1 * 3 + 1], 'X');
+}
+END_TEST
+
+/* ============================================================
+ * room_has_pushable_at null idx out
+ * ============================================================ */
+START_TEST(test_room_has_pushable_null_idx)
+{
+    Pushable push = { .x = 1, .y = 1, .id = 0 };
+    r->pushables = &push;
+    r->pushable_count = 1;
+
+    ck_assert(room_has_pushable_at(r, 1, 1, NULL));
+
+    r->pushables = NULL;
+    r->pushable_count = 0;
+}
+END_TEST
+
+/* ============================================================
  * Suite Setup
  * ============================================================ */
 Suite *room_suite(void) {
@@ -1070,6 +1223,16 @@ Suite *room_suite(void) {
     tcase_add_test(tc_core, test_room_get_treasure_at_collected);
     tcase_add_test(tc_core, test_room_try_push_all_directions);
     tcase_add_test(tc_core, test_room_try_push_invalid_direction);
+
+    tcase_add_test(tc_core, test_room_set_floor_grid_replace);
+    tcase_add_test(tc_core, test_room_set_portals_replace);
+    tcase_add_test(tc_core, test_room_set_treasures_replace);
+    tcase_add_test(tc_core, test_room_get_portal_destination_no_portals);
+    tcase_add_test(tc_core, test_room_get_treasure_at_null);
+    tcase_add_test(tc_core, test_room_classify_tile_oob);
+    tcase_add_test(tc_core, test_room_pick_up_then_get);
+    tcase_add_test(tc_core, test_room_render_portal_over_treasure);
+    tcase_add_test(tc_core, test_room_has_pushable_null_idx);
     suite_add_tcase(s, tc_core);
     return s;
 }

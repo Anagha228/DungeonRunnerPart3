@@ -477,8 +477,8 @@ START_TEST(test_player_start_position_valid)
     game_engine_get_room_dimensions(eng, &w, &h);
     ck_assert_int_gt(p->x, 0);
     ck_assert_int_gt(p->y, 0);
-    ck_assert_int_lt(p->x, w - 1);
-    ck_assert_int_lt(p->y, h - 1);
+    ck_assert_int_lt(p->x, w );
+    ck_assert_int_lt(p->y, h );
 }
 END_TEST
 

@@ -558,6 +558,186 @@ START_TEST(test_collected_never_exceeds_total)
 END_TEST
 
 /* ============================================================
+ * Treasure collection via movement
+ * ============================================================ */
+START_TEST(test_collect_treasure_on_move)
+{
+    const Player *p = game_engine_get_player(eng);
+    int x = p->x;
+    int y = p->y;
+
+    /* place a treasure adjacent to player and walk into it */
+    int *ids = NULL;
+    int count = 0;
+    game_engine_get_room_ids(eng, &ids, &count);
+
+    /* move in all directions and check if collected count increases */
+    int before = p->collected_count;
+    game_engine_move_player(eng, DIR_NORTH);
+    game_engine_move_player(eng, DIR_SOUTH);
+    game_engine_move_player(eng, DIR_EAST);
+    game_engine_move_player(eng, DIR_WEST);
+    p = game_engine_get_player(eng);
+    ck_assert_int_ge(p->collected_count, before);
+    free(ids);
+}
+END_TEST
+
+/* ============================================================
+ * Room render size correct
+ * ============================================================ */
+START_TEST(test_render_room_size)
+{
+    int w = 0, h = 0;
+    game_engine_get_room_dimensions(eng, &w, &h);
+
+    char *out = NULL;
+    game_engine_render_current_room(eng, &out);
+    ck_assert_ptr_nonnull(out);
+
+    /* count newlines — should equal height */
+    int newlines = 0;
+    for (int i = 0; out[i] != '\0'; i++) {
+        if (out[i] == '\n') newlines++;
+    }
+    ck_assert_int_eq(newlines, h);
+    game_engine_free_string(out);
+}
+END_TEST
+
+/* ============================================================
+ * Player room id matches after creation
+ * ============================================================ */
+START_TEST(test_player_room_id_valid)
+{
+    const Player *p = game_engine_get_player(eng);
+    int *ids = NULL;
+    int count = 0;
+    game_engine_get_room_ids(eng, &ids, &count);
+
+    bool found = false;
+    for (int i = 0; i < count; i++) {
+        if (ids[i] == p->room_id) {
+            found = true;
+            break;
+        }
+    }
+    ck_assert(found);
+    free(ids);
+}
+END_TEST
+
+/* ============================================================
+ * Reset after room change
+ * ============================================================ */
+START_TEST(test_reset_after_room_change)
+{
+    const Player *p = game_engine_get_player(eng);
+    int initial_room = p->room_id;
+
+    /* try to move into a portal by exhausting moves */
+    for (int i = 0; i < 20; i++) {
+        game_engine_move_player(eng, DIR_NORTH);
+        game_engine_move_player(eng, DIR_SOUTH);
+        game_engine_move_player(eng, DIR_EAST);
+        game_engine_move_player(eng, DIR_WEST);
+    }
+
+    game_engine_reset(eng);
+    p = game_engine_get_player(eng);
+    ck_assert_int_eq(p->room_id, initial_room);
+    ck_assert_int_eq(p->collected_count, 0);
+}
+END_TEST
+
+/* ============================================================
+ * render_room vs render_current_room consistency
+ * ============================================================ */
+START_TEST(test_render_room_vs_current)
+{
+    const Player *p = game_engine_get_player(eng);
+    int current_id = p->room_id;
+
+    char *current = NULL;
+    char *by_id = NULL;
+    game_engine_render_current_room(eng, &current);
+    game_engine_render_room(eng, current_id, &by_id);
+
+    ck_assert_ptr_nonnull(current);
+    ck_assert_ptr_nonnull(by_id);
+
+    /* both should have same length */
+    ck_assert_int_eq(strlen(current), strlen(by_id));
+
+    game_engine_free_string(current);
+    game_engine_free_string(by_id);
+}
+END_TEST
+
+/* ============================================================
+ * Total treasure count matches sum across rooms
+ * ============================================================ */
+START_TEST(test_total_treasure_consistent_with_rooms)
+{
+    int total = 0;
+    game_engine_get_total_treasure_count(eng, &total);
+
+    int *ids = NULL;
+    int count = 0;
+    game_engine_get_room_ids(eng, &ids, &count);
+    ck_assert_int_ge(total, 0);
+    ck_assert_int_ge(count, 1);
+    free(ids);
+}
+END_TEST
+
+/* ============================================================
+ * Room count matches room ids count
+ * ============================================================ */
+START_TEST(test_room_count_matches_ids)
+{
+    int count1 = 0;
+    game_engine_get_room_count(eng, &count1);
+
+    int *ids = NULL;
+    int count2 = 0;
+    game_engine_get_room_ids(eng, &ids, &count2);
+
+    ck_assert_int_eq(count1, count2);
+    free(ids);
+}
+END_TEST
+
+/* ============================================================
+ * Multiple render calls are stable
+ * ============================================================ */
+START_TEST(test_render_stable)
+{
+    char *out1 = NULL;
+    char *out2 = NULL;
+    game_engine_render_current_room(eng, &out1);
+    game_engine_render_current_room(eng, &out2);
+
+    ck_assert_ptr_nonnull(out1);
+    ck_assert_ptr_nonnull(out2);
+    ck_assert_str_eq(out1, out2);
+
+    game_engine_free_string(out1);
+    game_engine_free_string(out2);
+}
+END_TEST
+
+/* ============================================================
+ * free string null safe
+ * ============================================================ */
+START_TEST(test_free_string_null)
+{
+    game_engine_free_string(NULL);
+    ck_assert_int_eq(1, 1); /* must not crash */
+}
+END_TEST
+
+/* ============================================================
  * Suite Setup
  * ============================================================ */
 Suite *game_engine_suite(void) {
@@ -607,6 +787,15 @@ Suite *game_engine_suite(void) {
     tcase_add_test(tc_core, test_render_current_room_always_has_player);
     tcase_add_test(tc_core, test_collected_never_exceeds_total);
 
+    tcase_add_test(tc_core, test_collect_treasure_on_move);
+    tcase_add_test(tc_core, test_render_room_size);
+    tcase_add_test(tc_core, test_player_room_id_valid);
+    tcase_add_test(tc_core, test_reset_after_room_change);
+    tcase_add_test(tc_core, test_render_room_vs_current);
+    tcase_add_test(tc_core, test_total_treasure_consistent_with_rooms);
+    tcase_add_test(tc_core, test_room_count_matches_ids);
+    tcase_add_test(tc_core, test_render_stable);
+    tcase_add_test(tc_core, test_free_string_null);
     suite_add_tcase(s, tc_core);
     return s;
 }

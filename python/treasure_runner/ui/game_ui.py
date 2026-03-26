@@ -97,7 +97,7 @@ class GameUI:
         self._screen.addstr(row, 0, self._message)
         row = row+1
         self._screen.addstr(row, 0, f"Room Number = {self._engine.get_current_room_id()}  Room Name = {self._engine.get_current_room_name()}")
-        self._room_setup(row)
+        self._room_setup(row, self._engine.render_current_room().split("\n"))
         width, _ = self._engine.get_room_dimensions()
         charset = self._engine.get_charset()
         legend = [
@@ -126,8 +126,7 @@ class GameUI:
         self._message = ""
         self._screen.refresh()
 
-    def _room_setup(self, row):
-        room_lines = self._engine.render_current_room().split("\n")
+    def _room_setup(self, row, room_lines):
         row = row+1
          # map characters to color pair numbers
         charset = self._engine.get_charset()
@@ -143,13 +142,9 @@ class GameUI:
         }
         for i, line in enumerate(room_lines):
             for j, char in enumerate(line):
-                if color_map.get(char):
-                    pair, bold = color_map.get(char)
-                    attr = curses.color_pair(pair) | bold
-                else:
-                    attr = curses.A_NORMAL
+                pair, bold = color_map.get(char, (0, 0))
                 try:
-                    self._screen.addch(row + i, 4 + j, char, attr)
+                    self._screen.addch(row + i, 4 + j, char, curses.color_pair(pair) | bold if pair else curses.A_NORMAL)
                 except curses.error:
                     pass
 
